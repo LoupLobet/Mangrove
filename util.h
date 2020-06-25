@@ -1,2 +1,1 @@
 #define VERSION "0.1"
-#define KINSHIP_LINE_SIZE 256
