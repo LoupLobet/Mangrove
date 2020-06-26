@@ -81,7 +81,7 @@ main(int argc, char *argv[])
 		} else if (cmd.action != 0) {
 			usage();
 		/* actions taking zero argument */
-		} else if (!strcmp(argv[i], "-lt")) {
+		} else if (!strcmp(argv[i], "-L")) {
 			cmd.action = TREELIST;
 		} else if ((i + 1 == argc)
 		       || (cmd.action != 0)) {
@@ -386,7 +386,7 @@ treelist(void)
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-v] [[-b parent child] | [-d tree] | [-k pid] \n"
+	fprintf(stderr, "usage: %s [-Lv] [[-b parent child] | [-d tree] | [-k pid] \n"
 	        "		    | [-l tree pid1 pid2] | [-m tree] | [-mf tree format] \n"
 	        "                    | [-n tree] | [-u tree pid1 pid2] | [-ua tree pid]\n"
 	        "                    | [-uc tree pid] | [-up tree pid] | [-w tree]]\n"
