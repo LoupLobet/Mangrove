@@ -15,6 +15,7 @@
 #define MAX_KINSHIPS_NUMBER 256
 #define MAX_TREES_NUMBER    64
 #define TREE_LINE_SIZE      64
+#define PID_MAX_LINK	    64
 
 enum {
 	BIDIR, 
@@ -270,11 +271,19 @@ gettreebyname(char *treename)
 }
 
 static int
-mkill(int pid2kill)
+mkill(int pid)
 {
+	int i, j; 
+
+
+	kill(pid, SIGKILL);
 	/* search for pid2kill into trees */
-	//kill(pid2kill, SIGKILL);
-	
+	for (i = 0; i < treesnb; i++)
+		for (j = 0; j < trees[i].kinshipsnumber; j++)
+			if (trees[i].kinships[j][0] == pid) {
+				kill(trees[i].kinships[j][1], SIGKILL);
+				printf("%d\n", trees[i].kinships[j][1]);
+			}
 	return 0;
 }
 
