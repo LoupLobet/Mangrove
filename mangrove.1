@@ -1,0 +1,166 @@
+.TH MANGROVE 1 mangrove\-VERSION
+
+.SH NAME
+mang - mangrove
+.SH SYNOPSIS
+.B mang
+.RB [ \-Lv ]
+.RB [ 
+.RB [ \-b
+.IR parent 
+.IR child 
+.RB ] 
+.RB | 
+.RB [ \-d
+.IR tree 
+.RB ]
+.RB | 
+.RB [ \-k
+.IR pid 
+.RB ]
+.RB |
+.RB [ -l
+.IR tree
+.IR parent
+.IR child
+.RB ]
+.RB | 
+.RB [ \-m
+.IR tree
+.RB ]
+.RB |
+.RB [ \-mf
+.IR tree
+.IR format
+.RB ]
+.RB |
+.RB [ \-n
+.IR tree
+.RB ]
+.RB |
+.RB [ \-u
+.IR tree
+.IR parent
+.IR child
+.RB ]
+.RB |
+.RB [ \-ua
+.IR tree
+.IR pid
+.RB ]
+.RB |
+.RB [ \-uc
+.IR tree
+.IR pid
+.RB ]
+.RB |
+.RB [ \-up
+.IR tree
+.IR pid
+.RB ]
+.RB |
+.RB [ \-w
+.IR tree
+.RB ]
+.RB ]
+.SH DESCRIPTION
+.B mangrove
+is a relationship manager for 
+.IR linux 
+and 
+.IR
+BSD
+processes. It allows you to create modify and delete virtual process trees. allowing to manage the simultaneous closing of processes or applications.
+.P
+.B mangrove
+trees are made up of links that indicate the relationship of one process to another. It is possible to create several trees and interact independently with each of them.
+.P
+Each tree is represented by a text file and can therefore be copied, moved or deleted manually. Each line of a tree corresponds to a relationship, and is broken down into 3 columns, namely: 
+.IR parent
+.IR symbol
+.IR child.
+.P
+.B exemple:
+19299	-> 2334 (Here the 19299 is a virtual parent of 2334).
+.P
+The kinship symbol can be changed from
+.IR config.h
+and is purely aesthetic (it can be replaced by a simple tab or a space). Thus, mangrove allows to kill, several logically linked processes at the same time, with the 
+.IR -k 
+option.
+.SH OPTIONS
+.TP
+.B \-L
+List all trees.
+.TP
+.B \-v
+Show mangrove version.
+.TP
+.BI \-b " parent child"
+Create a bidirectional link, the two pids are parent to each other.
+.TP
+.BI \-d " tree"
+Delete
+.IR tree.
+.TP
+.BI \-k " pid"
+Kill the specified 
+.IR pid
+and all child pids specified in mangrove trees.
+.TP
+.BI \-l " tree parent child"
+Create link in
+.IR tree
+between
+.IR parent
+and
+.IR child.
+.TP
+.BI \-m " tree"
+List all kinships in
+.IR tree.
+.TP
+.BI \-mf " tree format"
+Equivalent of
+.B -m
+,but using
+.IR format
+instead of 
+.IR symbol.
+.TP
+.BI \-n " tree"
+Create a new tree, named
+.IR tree.
+.TP
+.BI \-u " tree parent child"
+Unlink
+.IR parent
+and
+.IR child
+in
+.IR tree.
+.TP
+.BI \-ua " tree pid"
+Remove all links in
+.IR tree
+, where
+.IR pid
+is a parent or a child.
+.TP
+.BI \-uc " tree pid"
+Remove all links in
+.IR tree
+, where
+.IR pid
+is a child.
+.TP
+.BI \-up " tree pid"
+Remove all links in
+.IR tree
+, where
+.IR pid
+is a parent.
+.TP
+.BI \-w " tree"
+Remove all links in
+.IR tree.
