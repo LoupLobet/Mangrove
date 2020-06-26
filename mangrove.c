@@ -11,7 +11,6 @@
 #include <signal.h>
 
 #include "config.h"
-#include "util.h"
 
 #define MAX_KINSHIPS_NUMBER 256
 #define MAX_TREES_NUMBER    64
