@@ -21,8 +21,9 @@ enum {
 	BIDIR, 
 	CLEAR, 
 	DELETETREE,
-	KILL, //todo
+	KILL, 
 	CLINK,
+	LINKLISTFORMAT,
 	LINKLIST,
 	NEWTREE,
 	TREELIST,
@@ -52,7 +53,7 @@ static int	deletetree(char *);
 static int	fetchtrees(void);
 static int	gettreebyname(char *);
 static int	mkill(int);
-static int	linklist(char *);
+static int	linklist(char *, char *);
 static int 	newtree(char *);
 static void	run(void);
 static int 	treelist(void);
@@ -96,6 +97,9 @@ main(int argc, char *argv[])
 			cmd.action = KILL;
 			if ((cmd.pids[0] = strtol(argv[++i], &ptr, 10)) == 0)
 				usage();
+		} else if (!strcmp(argv[i], "-m")) {
+			cmd.action = LINKLIST;
+			cmd.tree = argv[++i];
 		} else if (!strcmp(argv[i], "-n")) {
 			cmd.action = NEWTREE;
 			cmd.tree = argv[++i];
@@ -108,8 +112,8 @@ main(int argc, char *argv[])
 			cmd.tree = argv[++i];
 			if ((cmd.pids[0] = strtol(argv[++i], &ptr, 10)) == 0)
 				usage();
-		} else if (!strcmp(argv[i], "-m")) {
-			cmd.action = LINKLIST;
+		} else if (!strcmp(argv[i], "-mf")) {
+			cmd.action = LINKLISTFORMAT;
 			cmd.tree = argv[++i];
 			cmd.symbol = argv[++i];
 		} else if (!strcmp(argv[i], "-up")) {
@@ -288,22 +292,20 @@ mkill(int pid)
 }
 
 static int
-linklist(char *treename)
+linklist(char *treename, char *format)
 {
 	int i, treeindex;	
-	char *symbol = NULL;
 
-	/* 
-	 * If the command line given symbol is "*", take the linksymbol var from config.h.
-	 */
-	if (!strcmp(cmd.symbol, ""))
-		symbol = linksymbol;
-	else 
-		symbol = cmd.symbol;
 	if ((treeindex = gettreebyname(treename)) != -1) {
 		for (i = 0; i < trees[treeindex].kinshipsnumber; i++) {
-			printf("%u%s%u\n", trees[treeindex].kinships[i][0],
-			symbol, trees[treeindex].kinships[i][1]);
+			if (cmd.action == LINKLIST)
+				/* use config.h linksymbol string */
+				printf("%u%s%u\n", trees[treeindex].kinships[i][0],
+				linksymbol, trees[treeindex].kinships[i][1]);
+			else if (cmd.action == LINKLISTFORMAT)
+				/* use given format (from command line) */
+				printf("%u%s%u\n", trees[treeindex].kinships[i][0],
+				format, trees[treeindex].kinships[i][1]);
 		}
 		return 0;
 	} else {
@@ -350,7 +352,8 @@ run(void)
 	case KILL :
 		exit(mkill(cmd.pids[0]));
 	case LINKLIST :
-		exit(linklist(cmd.tree));
+	case LINKLISTFORMAT:
+		exit(linklist(cmd.tree, cmd.symbol));
 		break;
 	case NEWTREE :
 		exit(newtree(cmd.tree));
@@ -384,7 +387,7 @@ static void
 usage(void)
 {
 	fprintf(stderr, "usage: %s [-v] [[-b parent child] | [-d tree] | [-k pid] \n"
-	        "		    | [-l tree pid1 pid2] | [-mf tree format] \n"
+	        "		    | [-l tree pid1 pid2] | [-m tree] | [-mf tree format] \n"
 	        "                    | [-n tree] | [-u tree pid1 pid2] | [-ua tree pid]\n"
 	        "                    | [-uc tree pid] | [-up tree pid] | [-w tree]]\n"
 	      , getprogname());
