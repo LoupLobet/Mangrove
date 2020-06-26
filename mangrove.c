@@ -1,5 +1,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
+
+#include <bsd/stdlib.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -68,6 +70,8 @@ main(int argc, char *argv[])
 	int i;
 	char *ptr;
 
+	if (argc == 1)
+		usage();
 	for (i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-v")) {
 			puts("mangrove-"VERSION);
@@ -371,9 +375,11 @@ treelist(void)
 static void
 usage(void)
 {
-	fputs("usage: mangrove [-vlc] [-p parent child] [-u parent child] [-k tree parentsymbol]\n"
-	      "		[-k pid] [-f pid] [-b parent child] [-t tree] [-d tree]\n"
-	      ,stderr);
+	fprintf(stderr, "usage: %s [-v] [[-b parent child] | [-d tree] | [-k pid] \n"
+	        "		    | [-l tree pid1 pid2] | [-mf tree format] \n"
+	        "                    | [-n tree] | [-u tree pid1 pid2] | [-ua tree pid]\n"
+	        "                    | [-uc tree pid] | [-up tree pid] | [-w tree]]\n"
+	      , getprogname());
 	exit(1);
 }
 
