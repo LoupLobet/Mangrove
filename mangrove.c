@@ -4,6 +4,7 @@
 #include <bsd/stdlib.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,12 +21,14 @@
 enum {
 	BIDIR, 
 	CLEAR, 
-	DELETETREE,
+	DISABLETREE,
+	ENABLETREE,
 	KILL, 
 	CLINK,
 	LINKLISTFORMAT,
 	LINKLIST,
 	NEWTREE,
+	REMOVETREE,
 	TREELIST,
 	UCHILD,
 	ULINK,
@@ -41,7 +44,7 @@ typedef struct {
 } CommandLine;
 
 typedef struct {
-	int active;
+	int enable;
 	int kinships[MAX_KINSHIPS_NUMBER][2];
 	int kinshipsnumber;
 	char *name;
@@ -50,6 +53,8 @@ typedef struct {
 static int	clear(char *);
 static int	clink(char* ,int, int);
 static int	deletetree(char *);
+static int	disabletree(char *);
+static int	enabletree(char *);
 static int	fetchtrees(void);
 static int	gettreebyname(char *);
 static int	mkill(int);
@@ -87,11 +92,11 @@ main(int argc, char *argv[])
 		       || (cmd.action != 0)) {
 			usage();
 		/* actions taking one argument */
-		} else if (!strcmp(argv[i], "-w")) {
-			cmd.action = CLEAR;
-			cmd.tree = argv[++i];
 		} else if (!strcmp(argv[i], "-d")) {
-			cmd.action = DELETETREE;
+			cmd.action = DISABLETREE;
+			cmd.tree = argv[++i];
+		} else if (!strcmp(argv[i], "-e")) {
+			cmd.action = ENABLETREE;
 			cmd.tree = argv[++i];
 		} else if (!strcmp(argv[i], "-k")) {
 			cmd.action = KILL;
@@ -102,6 +107,12 @@ main(int argc, char *argv[])
 			cmd.tree = argv[++i];
 		} else if (!strcmp(argv[i], "-n")) {
 			cmd.action = NEWTREE;
+			cmd.tree = argv[++i];
+		} else if (!strcmp(argv[i], "-r")) {
+			cmd.action = REMOVETREE;
+			cmd.tree = argv[++i];
+		} else if (!strcmp(argv[i], "-w")) {
+			cmd.action = CLEAR;
 			cmd.tree = argv[++i];
 		} else if ((i + 2 == argc) 
 		       || (cmd.action != 0)) {
@@ -215,11 +226,45 @@ deletetree(char *treename)
 }
 
 static int
+disabletree(char * treename)
+{
+	char *buffer;
+
+	buffer = malloc(1 + strlen(treename));
+	sprintf(buffer, ".%s", treename);
+	if (remove(buffer) == 0) {
+		free(buffer);
+		return 0;
+	} else {
+		free(buffer);
+		return 1;
+	}
+}
+
+static int
+enabletree(char * treename)
+{
+	char *buffer;
+	FILE *treefile;
+	
+	buffer = malloc(1 + strlen(treename));
+	sprintf(buffer, ".%s", treename);
+	if ((treefile = fopen(buffer, "a"))) {
+		free(buffer);
+		return 0;
+	} else {
+		free(buffer);
+		return 1;
+	}
+}
+
+static int
 fetchtrees(void)
 {
 	char linebuffer[TREE_LINE_SIZE];
 	struct dirent *dir;
 	char *ptr;
+	char *buffer;
 	DIR *root;
 	FILE *tree;
 
@@ -231,12 +276,21 @@ fetchtrees(void)
 		if (chdir(rootdir) == -1)
 			return 1;
 		while ((dir = readdir(root)) != NULL) {
-			if ((!strcmp(dir->d_name, "."))
-			|| (!strcmp(dir->d_name, "..")))
+			if (dir->d_name[0] == '.')
 				continue;
 			trees[treesnb].name = malloc(strlen(dir->d_name));
 			strcpy(trees[treesnb].name, dir->d_name);
 			trees[treesnb].kinshipsnumber = 0;
+			buffer = malloc(1 + strlen(trees[treesnb].name));
+			/* 
+			 * search for a dot file with the same tree name
+			 * to know if the tree is enable or not
+			 */
+			sprintf(buffer, ".%s", trees[treesnb].name);
+			if (access(buffer, F_OK) != -1)
+				trees[treesnb].enable = 1;
+			else
+				trees[treesnb].enable = 0;
 			/* read and parse the tree */
 			tree = fopen(trees[treesnb].name, "r");
 			while ((fgets(linebuffer, TREE_LINE_SIZE, tree) != NULL)) {
@@ -282,12 +336,15 @@ mkill(int pid)
 
 	kill(pid, SIGKILL);
 	/* search for pid2kill into trees */
-	for (i = 0; i < treesnb; i++)
-		for (j = 0; j < trees[i].kinshipsnumber; j++)
-			if (trees[i].kinships[j][0] == pid) {
-				kill(trees[i].kinships[j][1], SIGKILL);
-				printf("%d\n", trees[i].kinships[j][1]);
+	for (i = 0; i < treesnb; i++) {
+		if (trees[i].enable) {
+			for (j = 0; j < trees[i].kinshipsnumber; j++)
+				if (trees[i].kinships[j][0] == pid) {
+					kill(trees[i].kinships[j][1], SIGKILL);
+					printf("%d\n", trees[i].kinships[j][1]);
 			}
+		}
+	}
 	return 0;
 }
 
@@ -316,14 +373,22 @@ linklist(char *treename, char *format)
 static int
 newtree(char *treename)
 {
+	char *buffer;
 	FILE *treefile;
+	FILE *enable;
 	
+	buffer = malloc(1 + strlen(treename));
+	sprintf(buffer, ".%s", treename);
 	if ((chdir(rootdir) != -1)
-	&& (treefile = fopen(treename, "a")))
+	&& (treefile = fopen(treename, "a"))
+	&& ((enable = fopen(buffer, "a"))))
 	{
+		free(buffer);
 		fclose(treefile);
+		fclose(enable);
 		return 0;
 	} else {
+		free(buffer);
 		printf("mangrove, can't create new tree: %s\n", treename);
 	}
 	return 1;
@@ -346,7 +411,11 @@ run(void)
 	case CLINK :
 		exit(clink(cmd.tree, cmd.pids[0], cmd.pids[1]));
 		break;
-	case DELETETREE :
+	case DISABLETREE :
+		exit(disabletree(cmd.tree));
+	case ENABLETREE :
+		exit(enabletree(cmd.tree));
+	case REMOVETREE :
 		exit(deletetree(cmd.tree));
 		break;
 	case KILL :
@@ -379,7 +448,10 @@ treelist(void)
 	int i;
 
 	for (i = 0; i < treesnb; i++)
-		puts(trees[i].name);
+		if (trees[i].enable)
+			printf("[*] %s\n", trees[i].name);
+		else
+			printf("[ ] %s\n", trees[i].name);
 	return 0;
 }
 
