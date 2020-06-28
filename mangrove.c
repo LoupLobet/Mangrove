@@ -61,7 +61,7 @@ static int	gettreebyname(char *);
 static int	mkill(int);
 static int	linklist(char *, char *);
 static int 	newtree(char *);
-static void	run(void);
+__dead void	run(void);
 static int 	treelist(void);
 __dead void	usage(void);
 static int	ulink(char *, int, int);
@@ -397,7 +397,7 @@ newtree(char *treename)
 	return 1;
 }
 
-static void
+__dead void
 run(void)
 {
 	if (fetchtrees() == 1) {
@@ -440,9 +440,9 @@ run(void)
 		exit(ulink(cmd.tree, cmd.pids[0], cmd.pids[1]));
 		break;
 	default :
+		exit(1);
 		break;
 	}
-	exit(0);
 }
 
 static int
@@ -461,9 +461,9 @@ treelist(void)
 __dead void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-Lv] [[-b parent child] | [-d tree] | [-k pid] \n"
-	        "		    | [-l tree pid1 pid2] | [-m tree] | [-mf tree format] \n"
-	        "                    | [-n tree] | [-u tree pid1 pid2] | [-ua tree pid]\n"
+	fprintf(stderr, "usage: %s [-Lv] [[-b parent child] | [-d tree] | [-e tree] | [-k pid] \n"
+	        "		    | [-l tree pid1 pid2] | [-m tree] | [-mf tree format] [-n tree]\n"
+	        "                    | [-r tree] | [-u tree pid1 pid2] | [-ua tree pid]\n"
 	        "                    | [-uc tree pid] | [-up tree pid] | [-w tree]]\n"
 	      , getprogname());
 	exit(1);
