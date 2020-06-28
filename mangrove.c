@@ -1,3 +1,4 @@
+#include <sys/cdefs.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -11,7 +12,7 @@
 #include <unistd.h>
 #include <signal.h>
 
-#include "config.h"
+#define __dead __attribute__((noreturn))
 
 #define MAX_KINSHIPS_NUMBER 256
 #define MAX_TREES_NUMBER    64
@@ -62,13 +63,15 @@ static int	linklist(char *, char *);
 static int 	newtree(char *);
 static void	run(void);
 static int 	treelist(void);
-static void	usage(void);
+__dead void	usage(void);
 static int	ulink(char *, int, int);
 
 /* variables */
 CommandLine cmd = {{0}, 0, NULL, NULL};
 Tree trees[MAX_TREES_NUMBER];
 int treesnb = 0;
+
+#include "config.h"
 
 int
 main(int argc, char *argv[])
@@ -455,7 +458,7 @@ treelist(void)
 	return 0;
 }
 
-static void
+__dead void
 usage(void)
 {
 	fprintf(stderr, "usage: %s [-Lv] [[-b parent child] | [-d tree] | [-k pid] \n"
