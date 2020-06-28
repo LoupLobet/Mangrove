@@ -15,6 +15,10 @@ mang - mangrove
 .IR tree 
 .RB ]
 .RB | 
+.RB [ \-e
+.IR tree
+.RB ]
+.RB |
 .RB [ \-k
 .IR pid 
 .RB ]
@@ -35,6 +39,10 @@ mang - mangrove
 .RB ]
 .RB |
 .RB [ \-n
+.IR tree
+.RB ]
+.RB |
+.RB [ \-r
 .IR tree
 .RB ]
 .RB |
@@ -100,7 +108,11 @@ Show mangrove version.
 Create a bidirectional link, the two pids are parent to each other.
 .TP
 .BI \-d " tree"
-Delete
+Disable
+.IR tree.
+.TP
+.BI \-e " tree"
+Enable
 .IR tree.
 .TP
 .BI \-k " pid"
@@ -130,6 +142,10 @@ instead of
 .TP
 .BI \-n " tree"
 Create a new tree, named
+.IR tree.
+.TP
+.BI \-r " tree"
+Remove
 .IR tree.
 .TP
 .BI \-u " tree parent child"
