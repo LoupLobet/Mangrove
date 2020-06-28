@@ -28,6 +28,7 @@ enum {
 	CLINK,
 	LINKLISTFORMAT,
 	LINKLIST,
+	LINKALL,
 	NEWTREE,
 	REMOVETREE,
 	TREELIST,
@@ -60,6 +61,7 @@ static int	fetchtrees(void);
 static int	gettreebyname(char *);
 static int	mkill(int);
 static int	linklist(char *, char *);
+static int	linkall(char *, char *);
 static int 	newtree(char *);
 __dead void	run(void);
 static int 	treelist(void);
@@ -140,6 +142,10 @@ main(int argc, char *argv[])
 			cmd.tree = argv[++i];
 			if ((cmd.pids[0] = strtol(argv[++i], &ptr, 10)) == 0)
 				usage();
+		} else if (!strcmp(argv[i], "-la")) {
+			cmd.action = LINKALL;
+			cmd.tree = argv[++i];
+			cmd.symbol = argv[++i];
 		} else if ((i + 3 == argc)
 		       || (cmd.action != 0)) {
 			usage();
@@ -336,18 +342,42 @@ mkill(int pid)
 {
 	int i, j; 
 
-
+	cmd.action = ULINK;
 	kill(pid, SIGKILL);
-	/* search for pid2kill into trees */
+	/* search for the given pid into the trees */
 	for (i = 0; i < treesnb; i++) {
 		if (trees[i].enable) {
 			for (j = 0; j < trees[i].kinshipsnumber; j++)
 				if (trees[i].kinships[j][0] == pid) {
-					kill(trees[i].kinships[j][1], SIGKILL);
-					printf("%d\n", trees[i].kinships[j][1]);
+					ulink(trees[i].name, pid, trees[i].kinships[j][1]);
+					trees[i].kinships[j][0] = 0;
+					printf("%d\n", pid);
+					mkill(trees[i].kinships[j][1]);
+					trees[i].kinships[j][1] = 0;
 			}
 		}
 	}
+	return 0;
+}
+
+static int
+linkall(char *treename, char *pidlist)
+{
+	char *firsttoken;
+	char *token1;
+	char *token2;
+	char *ptr;
+	
+	cmd.action = BIDIR;
+	token1 = strtok(pidlist, "\n");
+	token2 = strtok(NULL, "\n");
+	firsttoken = token1;
+	while (token2 != NULL) {
+		clink(treename, strtol(token2, &ptr, 10), strtol(token1, &ptr, 10));
+		token1 = token2;
+		token2 = strtok(NULL, "\n");
+	}
+	clink(treename, strtol(token1, &ptr, 10), strtol(firsttoken, &ptr, 10));
 	return 0;
 }
 
@@ -423,6 +453,8 @@ run(void)
 		break;
 	case KILL :
 		exit(mkill(cmd.pids[0]));
+	case LINKALL :
+		exit(linkall(cmd.tree, cmd.symbol));
 	case LINKLIST :
 	case LINKLISTFORMAT:
 		exit(linklist(cmd.tree, cmd.symbol));
