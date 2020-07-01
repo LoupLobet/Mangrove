@@ -2,7 +2,7 @@
 VERSION = 0.1.3
 
 # compiler
-CC = cc
+CC = gcc
 
 # paths
 PREFIX = /usr/local
