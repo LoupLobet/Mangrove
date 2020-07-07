@@ -8,23 +8,21 @@ options:
 	@echo "CC     = ${CC}"
 
 mangrove: mangrove.c
-	${CC} ${CFLAGS} -o mangrove mangrove.c
+	${CC} ${CFLAGS} -o mang mangrove.c
 
 clean:
-	rm -f mangrove
+	rm -f mang
 
 install: all
 	mkdir -p ${DESTDIR}${PREFIX}/bin
-	cp -r mangrove ${DESTDIR}${PREFIX}/bin
-	chmod 755 ${DESTDIR}${PREFIX}/bin/mangrove
+	cp -r mang ${DESTDIR}${PREFIX}/bin
+	chmod 755 ${DESTDIR}${PREFIX}/bin/mang
 	mkdir -p ${DESTDIR}${MANPREFIX}/man1
 	sed "s/VERSION/${VERSION}/g" < mangrove.1 > ${DESTDIR}${MANPREFIX}/man1/mangrove.1
 	ln -fs ${DESTDIR}${MANPREFIX}/man1/mangrove.1 ${DESTDIR}${MANPREFIX}/man1/mang.1 
-	ln -fs ${DESTDIR}${PREFIX}/bin/mangrove ${DESTDIR}${PREFIX}/bin/mang
 
 uninstall:
-	rm -f ${DESTDIR}${PREFIX}/bin/mangrove \
-	${DESTDIR}${PREFIX}/bin/mang \
+	rm -f ${DESTDIR}${PREFIX}/bin/mang \
 	${DESTDIR}${MANPREFIX}/man1/mangrove.1 \
 	${DESTDIR}${MANPREFIX}/man1/mang.1
 
