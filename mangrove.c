@@ -2,7 +2,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include <bsd/stdlib.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -11,15 +10,13 @@
 #include <unistd.h>
 #include <signal.h>
 
-#define __dead __attribute__((noreturn))
+#include "util.h"
 
-#define MAX_KINSHIPS_NUMBER 256
-#define MAX_TREES_NUMBER    256
-#define TREE_LINE_SIZE      256
+enum { ULINK, UPARENT, UCHILD, ULINKALL };
 
 typedef struct {
 	int enable;
-	int links[MAX_KINSHIPS_NUMBER][2];
+	int links[MAX_LINKS_NUMBER][2];
 	int linksnumber;
 	char *name;
 } Tree;
@@ -32,16 +29,15 @@ static int	disabletree(char *);
 static int	enabletree(char *);
 static int	fetchtrees(void);
 static int	gettreebyname(char *);
+static int	islink(int, int, int);
 static int	mkill(int);
 static int	listlink(char *);
-static int	linkall(char *, char *);
+//static int	linkall(char *, char *);
 static int 	newtree(char *);
+static int 	pidstat(char *, int);
 static int 	treelist(void);
 __dead void	usage(void);
-static int	uchild(char *, int);
-static int	ulink(char *, int, int);
-static int	ulinkall(char *, int);
-static int	uparent(char *, int);
+static int	ulink(char *, int, int, int);
 
 Tree trees[MAX_TREES_NUMBER];
 int treesnb = 0;
@@ -55,10 +51,8 @@ main(int argc, char *argv[])
 
 	if (argc == 1)
 		usage();
-	if (fetchtrees() == 1) {
+	if (fetchtrees() == 1)
 		puts("mangrove: can't fetch tree(s)\n");
-		exit(1);
-	}
 
 	i = 1;
 	/* actions taking zero argument */
@@ -90,13 +84,17 @@ main(int argc, char *argv[])
 	/* actions taking two arguments */
 	} else if (i + 3 == argc) {
 		if (!strcmp(argv[i], "-uc"))
-			exit(uchild(argv[i + 1], atoi(argv[i + 2])));
+			exit(ulink(argv[i + 1], atoi(argv[i + 2]), 0, UCHILD));
 		else if (!strcmp(argv[i], "-up"))
-			exit(uparent(argv[i + 1], atoi(argv[i + 2])));
+			exit(ulink(argv[i + 1], atoi(argv[i + 2]), 0, UPARENT));
 		else if (!strcmp(argv[i], "-ua"))
-			exit(ulinkall(argv[i + 1], atoi(argv[i + 2])));
+			exit(ulink(argv[i + 1], atoi(argv[i + 2]), 0, ULINKALL));
+		/*
 		else if (!strcmp(argv[i], "-la"))
 			exit(linkall(argv[i + 1], argv[i + 2]));
+		*/
+		else if (!strcmp(argv[i], "-s"))
+			exit(pidstat(argv[i + 1], atoi(argv[i + 2])));
 		else
 			usage();
 	/* actions taking three arguments */
@@ -106,13 +104,14 @@ main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "-l"))
 			exit(clink(argv[i + 1], atoi(argv[i + 2]), atoi(argv[i + 3])));
 		else if (!strcmp(argv[i], "-u"))
-			exit(ulink(argv[i + 1], atoi(argv[i + 2]), atoi(argv[i + 3])));
+			exit(ulink(argv[i + 1], atoi(argv[i + 2]), atoi(argv[i + 3]), ULINK));
 		else
 			usage();
 	} else {
 		usage();
 	}
 
+	/* free trees names */
 	for (int i = 0; i < treesnb; i++)
 		free(trees[i].name);
 
@@ -184,21 +183,20 @@ deletetree(char *tname)
 	int tindex;
 	char *dotfile;
 
+	/* remove tree enabeling */
+	if (trees[gettreebyname(tname)].enable) {
+		dotfile = alloca(strlen(tname) + 1);
+		sprintf(dotfile, ".%s", tname);
+		if (remove(dotfile) != 0)
+			return -1;
+	}
 	/* remove givern tree */
-	dotfile = malloc(strlen(tname) + 1);
-	sprintf(dotfile, ".%s", tname);
 	if (((tindex = gettreebyname(tname)) != -1)
 	&& (chdir(rootdir) != -1)
-	&& (remove(tname) == 0)
-	&& (remove(dotfile) == 0))
-	{
-		free(dotfile);
+	&& (remove(tname) == 0))
 		return 0;
-	} else {
-		free(dotfile);
-		puts("mangrove: can't delete specified tree\n");
-		return 1;
-	}
+	puts("mangrove: can't delete specified tree\n");
+	return 1;
 }
 
 static int
@@ -206,16 +204,13 @@ disabletree(char * tname)
 {
 	char *buf;
 
-	/* create dotfile name from the tree name */
-	buf = malloc(1 + strlen(tname));
+	/* remove the tree enabeling */
+	buf = alloca(1 + strlen(tname));
 	sprintf(buf, ".%s", tname);
-	if (remove(buf) == 0) {
-		free(buf);
+	if (remove(buf) == 0)
 		return 0;
-	} else {
-		free(buf);
+	else
 		return 1;
-	}
 }
 
 static int
@@ -225,21 +220,18 @@ enabletree(char * tname)
 	FILE *tfile;
 	
 	/* create dotfile name from the tree name */
-	buf = malloc(1 + strlen(tname));
+	buf = alloca(1 + strlen(tname));
 	sprintf(buf, ".%s", tname);
-	if ((tfile = fopen(buf, "a"))) {
-		free(buf);
+	if ((tfile = fopen(buf, "a")))
 		return 0;
-	} else {
-		free(buf);
+	else
 		return 1;
-	}
 }
 
 static int
 fetchtrees(void)
 {
-	char linebuf[TREE_LINE_SIZE];
+	char linebuf[MAX_LINE_LENGTH];
 	struct dirent *dir;
 	char *ptr;
 	char *dotfile;
@@ -259,7 +251,7 @@ fetchtrees(void)
 			trees[treesnb].name = malloc(strlen(dir->d_name));
 			strcpy(trees[treesnb].name, dir->d_name);
 			trees[treesnb].linksnumber = 0;
-			dotfile = malloc(1 + strlen(trees[treesnb].name));
+			dotfile = alloca(1 + strlen(trees[treesnb].name));
 			/* 
 			 * search for a dot file with the same tree name
 			 * to know if the tree is enable or not
@@ -269,10 +261,9 @@ fetchtrees(void)
 				trees[treesnb].enable = 1;
 			else
 				trees[treesnb].enable = 0;
-			free(dotfile);
 			/* read and parse the tree */
 			tree = fopen(trees[treesnb].name, "r");
-			while ((fgets(linebuf, TREE_LINE_SIZE, tree) != NULL)) {
+			while ((fgets(linebuf, MAX_LINE_LENGTH, tree) != NULL)) {
 				trees[treesnb].links[trees[treesnb].linksnumber][0]
 				= strtol(strtok(linebuf, linksymbol), &ptr, 10);
 				trees[treesnb].links[trees[treesnb].linksnumber][1]
@@ -308,46 +299,92 @@ gettreebyname(char *tname)
 }
 
 static int
-mkill(int pid)
+islink(int tindex, int parent, int child)
 {
-	int i, j; 
+	int i;
 
-	kill(pid, SIGKILL);
-	/* search for the given pid into the trees */
-	for (i = 0; i < treesnb; i++) {
-		if (trees[i].enable) {
-			for (j = 0; j < trees[i].linksnumber; j++)
-				if (trees[i].links[j][0] == pid) {
-					ulink(trees[i].name, pid, trees[i].links[j][1]);
-					trees[i].links[j][0] = 0;
-					printf("%d\n", pid);
-					mkill(trees[i].links[j][1]);
-					trees[i].links[j][1] = 0;
-			}
-		}
-	}
-	return 0;
+	for (i = 0; i < trees[tindex].linksnumber; i++)
+		if ((trees[tindex].links[i][0] == parent)
+		&& (trees[tindex].links[i][1] == child))
+			return 0;
+	return 1;
 }
 
 static int
-linkall(char *tname, char *pidlst)
+mkill(int pid)
 {
-	char *firstpid;
-	char *pid1;
-	char *pid2;
-	char *ptr;
-	
-	pid1 = strtok(pidlst, "\n");
-	pid2 = strtok(NULL, "\n");
-	firstpid = pid1;
-	while (pid2 != NULL) {
-		bidir(tname, strtol(pid2, &ptr, 10), strtol(pid1, &ptr, 10));
-		pid1 = pid2;
-		pid2 = strtok(NULL, "\n");
+	int killed[MAX_TREES_NUMBER * MAX_LINKS_NUMBER];
+	int killednb = 0;
+	int i, j, k, l; 
+
+	kill(pid, SIGKILL);
+	killed[killednb] = pid;
+	killednb++;
+	for (i = 0; i < treesnb; i++) {
+		/* ignore disabled trees */
+		if (!trees[i].enable)
+			continue;
+		for (j = 0; j < trees[i].linksnumber; j++)
+			for (k = 0; k < killednb; k++)
+			/*
+			 * if the link between the last killed 
+			 * pid and trees[i].links[j][1] exists
+			 */
+			/* 
+			 * the following block is not indented because
+			 * trying to respect 80 characters maximum lines.
+			 */
+			if (!islink(i, killed[k], trees[i].links[j][1])) {
+				kill(trees[i].links[j][1], SIGKILL);
+				killed[killednb] = trees[i].links[j][1];
+				killednb++;
+				memset(trees[i].links[j], 0, 2 * sizeof(int));
+				/* 
+				 * remove all links in current tree where 
+				 * trees[i].links[j][1] is a child
+				 */
+				for (l = 0; l < trees[i].linksnumber; l++)
+					if (trees[i].links[l][1] == trees[i].links[j][1])
+						memset(trees[i].links[l], 0, 2 * sizeof(int));
+			}
 	}
-	bidir(tname, strtol(pid1, &ptr, 10), strtol(firstpid, &ptr, 10));
 	return 0;
 }
+
+/*
+static int
+linkall(char *tname, char *pidlst)
+{
+	char **pids;
+	char *cpid;
+	int pidnb = 0;
+	int tindex;
+	int i = 0;
+	char *ptr;
+
+	if ((tindex = gettreebyname(tname)) == -1) {
+		puts("mangrove: can't cant create link(s) in specified tree");
+		return 1;
+	}
+	cpid = strtok(pidlst, "\n");
+	pids = alloca(sizeof(char *));
+	pids[pidnb] = alloca(strlen(cpid));
+	strcpy(pids[pidnb], cpid);
+	pidnb++;
+	while (cpid != NULL) {
+		for (i = 0; i < (pidnb - 1); i++) {
+			if (islink(tindex, strtol(cpid, &ptr, 10), strtol(pids[i], &ptr, 10)))
+				bidir(tname, strtol(cpid, &ptr, 10), strtol(pids[i], &ptr, 10));
+		}
+		cpid = strtok(NULL, "\n");
+		pids[pidnb] = alloca(strlen(cpid));
+		strcpy(pids[pidnb], cpid);
+		pidnb++;
+	}
+
+	return 0;
+}
+*/
 
 static int
 listlink(char *tname)
@@ -355,14 +392,15 @@ listlink(char *tname)
 	int i;
 	int tindex;	
 
-	if ((tindex = gettreebyname(tname)) != -1)
-		for (i = 0; i < trees[tindex].linksnumber; i++) {
+	if ((tindex = gettreebyname(tname)) != -1) {
+		for (i = 0; i < trees[tindex].linksnumber; i++)
 			printf("%u%s%u\n", trees[tindex].links[i][0],
 			linksymbol, trees[tindex].links[i][1]);
-		}
-	else 
+		return 0;
+	} else {
+		puts("mangrove: can't find specified tree\n");
 		return 1;	
-	return 0;
+	}
 }
 
 static int
@@ -372,21 +410,43 @@ newtree(char *tname)
 	FILE *tfile;
 	FILE *enable;
 	
-	buf = malloc(1 + strlen(tname));
+	buf = alloca(1 + strlen(tname));
 	sprintf(buf, ".%s", tname);
 	if ((chdir(rootdir) != -1)
 	&& (tfile = fopen(tname, "a"))
 	&& ((enable = fopen(buf, "a"))))
 	{
-		free(buf);
 		fclose(tfile);
 		fclose(enable);
 		return 0;
 	} else {
-		free(buf);
 		puts("mangrove, can't create new tree\n");
 	}
 	return 1;
+}
+
+static int
+pidstat(char *tname, int pid)
+{
+	int i;
+	int ischild = 0;
+	int isparent = 0;
+	int tindex;
+
+	if ((tindex = gettreebyname(tname)) != -1) {
+		for(i = 0;
+		   (i < trees[tindex].linksnumber);
+		   i++)
+		{
+			if (trees[tindex].links[i][0] == pid)
+				isparent = 1;
+			if (trees[tindex].links[i][1] == pid)
+				ischild = 2;
+		}
+		printf("%d\n", isparent + ischild);
+		return  0;
+	}
+	return -1;
 }
 
 static int
@@ -405,52 +465,20 @@ treelist(void)
 __dead void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-Lv] | [ [-b parent child] | [-d tree] | [-e tree] | [-k pid] | [-l tree pid pid] |\n"
-	                "		    [-la \"pids\"] | [-m tree] | [-n tree] | [-r tree] | [-u tree pid pid] |\n"
-	                "                    [-ua tree pid] | [-uc tree pid] | [-up tree pid] | [-w tree] ]\n"
+	fprintf(stderr, "usage: %s [ [-b parent child] | [-d tree] | [-e tree] | [-k pid] | \n"
+			"              [-l tree pid pid] | [-la pids] | [-m tree] | [-n tree] |\n"
+			"              [-r tree] | [-u tree pid pid] | [-ua tree pid] |\n"
+			"              [-uc tree pid] | [-up tree pid] | [-w tree] ]\n"
 	      , getprogname());
 	exit(1);
 }
 
 static int
-uchild(char *tname, int child)
+ulink(char *tname, int parent, int child, int flag)
 {
-	char linebuf[TREE_LINE_SIZE];
-	char linecpy[TREE_LINE_SIZE];
-	char filebuf[MAX_KINSHIPS_NUMBER * TREE_LINE_SIZE];
-	int pids[2];
-	char *ptr;
-	FILE *tfile;
-
-	/* copy tree into a string */
-	if ((chdir(rootdir) != -1)
-	&& ((tfile = fopen(tname, "r")))) {
-		while (fgets(linebuf, TREE_LINE_SIZE, tfile)) {
-			strcpy(linecpy, linebuf);
-			pids[0] = strtol(strtok(linecpy, linksymbol), &ptr, 10);
-			pids[1] = strtol(strtok(NULL, linksymbol), &ptr, 10);
-			/* filter */
-			if (pids[1] != child)
-				strcat(filebuf, linebuf);
-		}
-		fclose(tfile);
-		/* write filtered tree */
-		if ((tfile = fopen(tname, "w"))) {
-			fprintf(tfile, "%s", filebuf);
-			fclose(tfile);
-			return 0;
-		}
-	}
-	puts("mangrove: can't remove specified link(s)\n");
-	return 1;
-}
-
-static int
-ulink(char *tname, int parent, int child)
-{
-	char linebuf[TREE_LINE_SIZE];
-	char linecpy[TREE_LINE_SIZE];
-	char filebuf[MAX_KINSHIPS_NUMBER * TREE_LINE_SIZE];
+	char linebuf[MAX_LINE_LENGTH];
+	char linecpy[MAX_LINE_LENGTH];
+	char filebuf[MAX_LINKS_NUMBER * MAX_LINE_LENGTH];
 	int pids[2];
 	char *ptr;
 	FILE *tfile;
@@ -458,81 +486,32 @@ ulink(char *tname, int parent, int child)
 	/* copy tree into a string */
 	if ((chdir(rootdir) != -1)
 	&& ((tfile = fopen(tname, "r")))) {
-		while (fgets(linebuf, TREE_LINE_SIZE, tfile)) {
+		while (fgets(linebuf, MAX_LINE_LENGTH, tfile)) {
 			strcpy(linecpy, linebuf);
 			pids[0] = strtol(strtok(linecpy, linksymbol), &ptr, 10);
 			pids[1] = strtol(strtok(NULL, linksymbol), &ptr, 10);
 			/* filter */
-			if ((pids[0] != parent)
-			&& (pids[1] != child))
-				strcat(filebuf, linebuf);
-		}
-		fclose(tfile);
-		/* write filtered tree */
-		if ((tfile = fopen(tname, "w"))) {
-			fprintf(tfile, "%s", filebuf);
-			fclose(tfile);
-			return 0;
-		}
-	}
-	puts("mangrove: can't remove specified link(s)\n");
-	return 1;
-}
+			switch (flag) {
+			case ULINK:
+				if (!((pids[0] == parent)
+				&& (pids[1] == child)))
+					strcat(filebuf, linebuf);
+				break;
+			case UPARENT:
+				if (pids[0] != parent)
+					strcat(filebuf, linebuf);
+				break;
+			case UCHILD:
+				if (pids[1] != parent)
+					strcat(filebuf, linebuf);
+				break;
+			case ULINKALL:
+				if ((pids[0] != parent)
+				&& (pids[1] != parent))
+					strcat(filebuf, linebuf);
+				break;
+			}
 
-static int
-ulinkall(char *tname, int parent)
-{
-	char linebuf[TREE_LINE_SIZE];
-	char linecpy[TREE_LINE_SIZE];
-	char filebuf[MAX_KINSHIPS_NUMBER * TREE_LINE_SIZE];
-	int pids[2];
-	char *ptr;
-	FILE *tfile;
-
-	/* copy tree into a string */
-	if ((chdir(rootdir) != -1)
-	&& ((tfile = fopen(tname, "r")))) {
-		while (fgets(linebuf, TREE_LINE_SIZE, tfile)) {
-			strcpy(linecpy, linebuf);
-			pids[0] = strtol(strtok(linecpy, linksymbol), &ptr, 10);
-			pids[1] = strtol(strtok(NULL, linksymbol), &ptr, 10);
-			/* filter */
-			if ((pids[0] != parent)
-			|| (pids[1] != parent))
-				strcat(filebuf, linebuf);
-		}
-		fclose(tfile);
-		/* write filtered tree */
-		if ((tfile = fopen(tname, "w"))) {
-			fprintf(tfile, "%s", filebuf);
-			fclose(tfile);
-			return 0;
-		}
-	}
-	puts("mangrove: can't remove specified link(s)\n");
-	return 1;
-}
-
-static int
-uparent(char *tname, int parent)
-{
-	char linebuf[TREE_LINE_SIZE];
-	char linecpy[TREE_LINE_SIZE];
-	char filebuf[MAX_KINSHIPS_NUMBER * TREE_LINE_SIZE];
-	int pids[2];
-	char *ptr;
-	FILE *tfile;
-
-	/* copy tree into a string */
-	if ((chdir(rootdir) != -1)
-	&& ((tfile = fopen(tname, "r")))) {
-		while (fgets(linebuf, TREE_LINE_SIZE, tfile)) {
-			strcpy(linecpy, linebuf);
-			pids[0] = strtol(strtok(linecpy, linksymbol), &ptr, 10);
-			pids[1] = strtol(strtok(NULL, linksymbol), &ptr, 10);
-			/* filter */
-			if (pids[0] != parent)
-				strcat(filebuf, linebuf);
 		}
 		fclose(tfile);
 		/* write filtered tree */
