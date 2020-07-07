@@ -10,7 +10,7 @@ MANPREFIX = ${PREFIX}/share/man
 
 # flags
 
-# If you are using BSD comment next line and `#include bsd/unistd.h` in mangrove.c
+# If you are using BSD comment next line 
 LINUX = -lbsd
 
 CPPFLAGS = -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=2 -DVERSION=\"${VERSION}\"
