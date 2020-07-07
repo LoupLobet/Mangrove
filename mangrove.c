@@ -1,3 +1,4 @@
+/* See LICENSE for license details. */
 #include <sys/cdefs.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -11,8 +12,9 @@
 #include <signal.h>
 
 #include "util.h"
+#include "config.h"
 
-enum { ULINK, UPARENT, UCHILD, ULINKALL };
+enum { ULINK, UPARENT, UCHILD, ULINKALL }; /* ulink flags */
 
 typedef struct {
 	int enable;
@@ -32,17 +34,14 @@ static int	gettreebyname(char *);
 static int	islink(int, int, int);
 static int	mkill(int);
 static int	listlink(char *);
-//static int	linkall(char *, char *);
 static int 	newtree(char *);
 static int 	pidstat(char *, int);
 static int 	treelist(void);
-__dead void	usage(void);
+__dead void	usage(void); /* for linux __dead attribut is provided by util.h */
 static int	ulink(char *, int, int, int);
 
 Tree trees[MAX_TREES_NUMBER];
 int treesnb = 0;
-
-#include "config.h"
 
 int
 main(int argc, char *argv[])
@@ -52,7 +51,7 @@ main(int argc, char *argv[])
 	if (argc == 1)
 		usage();
 	if (fetchtrees() == 1)
-		puts("mangrove: can't fetch tree(s)\n");
+		puts("mangrove: can't fetch tree(s)");
 
 	i = 1;
 	/* actions taking zero argument */
@@ -89,10 +88,6 @@ main(int argc, char *argv[])
 			exit(ulink(argv[i + 1], atoi(argv[i + 2]), 0, UPARENT));
 		else if (!strcmp(argv[i], "-ua"))
 			exit(ulink(argv[i + 1], atoi(argv[i + 2]), 0, ULINKALL));
-		/*
-		else if (!strcmp(argv[i], "-la"))
-			exit(linkall(argv[i + 1], argv[i + 2]));
-		*/
 		else if (!strcmp(argv[i], "-s"))
 			exit(pidstat(argv[i + 1], atoi(argv[i + 2])));
 		else
@@ -134,7 +129,7 @@ bidir(char *tname, int parent, int child)
 		fclose(tfile);
 		return 0;
 	} else {
-		puts("mangrove: can't create the specified link\n");
+		puts("mangrove: can't create the specified link");
 	}
 	return 1;
 }
@@ -153,7 +148,7 @@ clear(char *tname)
 	&& (fclose(tfile) == 0))
 		return 0;
 	else
-		puts("mangrove: can't clear specified tree\n");
+		puts("mangrove: can't clear specified tree");
 	return 1;
 }
 
@@ -172,7 +167,7 @@ clink(char *tname, int parent, int child)
 		fclose(tfile);
 		return 0;
 	} else {
-		puts("mangrove: can't create the specified link\n");
+		puts("mangrove: can't create the specified link");
 	}
 	return 1;
 }
@@ -195,7 +190,7 @@ deletetree(char *tname)
 	&& (chdir(rootdir) != -1)
 	&& (remove(tname) == 0))
 		return 0;
-	puts("mangrove: can't delete specified tree\n");
+	puts("mangrove: can't delete specified tree");
 	return 1;
 }
 
@@ -233,8 +228,8 @@ fetchtrees(void)
 {
 	char linebuf[MAX_LINE_LENGTH];
 	struct dirent *dir;
-	char *ptr;
 	char *dotfile;
+	char *ptr;
 	DIR *root;
 	FILE *tree;
 
@@ -289,6 +284,10 @@ fetchtrees(void)
 static int
 gettreebyname(char *tname)
 {
+	/*
+	 * gettreebyname() is used to get index 
+	 * of a tree in trees[] array from his name.
+	 */
 	int i;
 	int tindex = -1;
 
@@ -301,6 +300,10 @@ gettreebyname(char *tname)
 static int
 islink(int tindex, int parent, int child)
 {
+	/*
+	 * if the link parent -> child exists in 
+	 * trees[tindex], return 0, else return 1.
+	 */
 	int i;
 
 	for (i = 0; i < trees[tindex].linksnumber; i++)
@@ -351,46 +354,12 @@ mkill(int pid)
 	return 0;
 }
 
-/*
-static int
-linkall(char *tname, char *pidlst)
-{
-	char **pids;
-	char *cpid;
-	int pidnb = 0;
-	int tindex;
-	int i = 0;
-	char *ptr;
-
-	if ((tindex = gettreebyname(tname)) == -1) {
-		puts("mangrove: can't cant create link(s) in specified tree");
-		return 1;
-	}
-	cpid = strtok(pidlst, "\n");
-	pids = alloca(sizeof(char *));
-	pids[pidnb] = alloca(strlen(cpid));
-	strcpy(pids[pidnb], cpid);
-	pidnb++;
-	while (cpid != NULL) {
-		for (i = 0; i < (pidnb - 1); i++) {
-			if (islink(tindex, strtol(cpid, &ptr, 10), strtol(pids[i], &ptr, 10)))
-				bidir(tname, strtol(cpid, &ptr, 10), strtol(pids[i], &ptr, 10));
-		}
-		cpid = strtok(NULL, "\n");
-		pids[pidnb] = alloca(strlen(cpid));
-		strcpy(pids[pidnb], cpid);
-		pidnb++;
-	}
-
-	return 0;
-}
-*/
-
 static int
 listlink(char *tname)
 {
+	/* display raw infos about the spacified tree */
 	int i;
-	int tindex;	
+	int tindex;
 
 	if ((tindex = gettreebyname(tname)) != -1) {
 		for (i = 0; i < trees[tindex].linksnumber; i++)
@@ -398,7 +367,7 @@ listlink(char *tname)
 			linksymbol, trees[tindex].links[i][1]);
 		return 0;
 	} else {
-		puts("mangrove: can't find specified tree\n");
+		puts("mangrove: can't find specified tree");
 		return 1;	
 	}
 }
@@ -407,8 +376,8 @@ static int
 newtree(char *tname)
 {
 	char *buf;
-	FILE *tfile;
 	FILE *enable;
+	FILE *tfile;
 	
 	buf = alloca(1 + strlen(tname));
 	sprintf(buf, ".%s", tname);
@@ -420,7 +389,7 @@ newtree(char *tname)
 		fclose(enable);
 		return 0;
 	} else {
-		puts("mangrove, can't create new tree\n");
+		puts("mangrove, can't create new tree");
 	}
 	return 1;
 }
@@ -428,9 +397,13 @@ newtree(char *tname)
 static int
 pidstat(char *tname, int pid)
 {
-	int i;
+	/* 
+	 * give info/status of a given pid,
+	 * please see man for return values
+	 */
 	int ischild = 0;
 	int isparent = 0;
+	int i;
 	int tindex;
 
 	if ((tindex = gettreebyname(tname)) != -1) {
@@ -465,9 +438,10 @@ treelist(void)
 __dead void
 usage(void)
 {
+	fprintf(stderr, "usage: %s [-Lv]\n", getprogname());
 	fprintf(stderr, "usage: %s [ [-b parent child] | [-d tree] | [-e tree] | [-k pid] | \n"
 			"              [-l tree pid pid] | [-la pids] | [-m tree] | [-n tree] |\n"
-			"              [-r tree] | [-u tree pid pid] | [-ua tree pid] |\n"
+			"              [-r tree] | [-s tree pid] | [-u tree pid pid] | [-ua tree pid] |\n"
 			"              [-uc tree pid] | [-up tree pid] | [-w tree] ]\n"
 	      , getprogname());
 	exit(1);
@@ -476,9 +450,13 @@ usage(void)
 static int
 ulink(char *tname, int parent, int child, int flag)
 {
+	/* 
+	 * this function handle ulink uparent uchild ulinkall
+	 * functions using flag value (see declaration for flag enum).
+	 */
+	char filebuf[MAX_LINKS_NUMBER * MAX_LINE_LENGTH];
 	char linebuf[MAX_LINE_LENGTH];
 	char linecpy[MAX_LINE_LENGTH];
-	char filebuf[MAX_LINKS_NUMBER * MAX_LINE_LENGTH];
 	int pids[2];
 	char *ptr;
 	FILE *tfile;
@@ -490,7 +468,7 @@ ulink(char *tname, int parent, int child, int flag)
 			strcpy(linecpy, linebuf);
 			pids[0] = strtol(strtok(linecpy, linksymbol), &ptr, 10);
 			pids[1] = strtol(strtok(NULL, linksymbol), &ptr, 10);
-			/* filter */
+			/* filters */
 			switch (flag) {
 			case ULINK:
 				if (!((pids[0] == parent)
@@ -521,6 +499,6 @@ ulink(char *tname, int parent, int child, int flag)
 			return 0;
 		}
 	}
-	puts("mangrove: can't remove specified link(s)\n");
+	puts("mangrove: can't remove specified link(s)");
 	return 1;
 }
