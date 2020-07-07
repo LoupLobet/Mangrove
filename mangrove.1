@@ -42,6 +42,11 @@ mang - mangrove
 .IR tree
 .RB ]
 .RB |
+.RB [ \-s
+.IR tree
+.IR pid
+.RB ]
+.RB |
 .RB [ \-u
 .IR tree
 .IR parent
@@ -143,6 +148,21 @@ Create a new tree, named
 .BI \-r " tree"
 Remove
 .IR tree.
+.TP
+.BI \-s " tree pid"
+Returns a numerical value indicating the nature of a 
+.IR pid 
+in a specific 
+.IR tree. 
+Return values are follows: 0 -> the
+.IR pid 
+is not in the specified tree, 1 -> the 
+.IR pid 
+is a parent, 2 -> the 
+.IR pid 
+is a child, 3 -> the 
+.IR pid 
+is a parent and a child.
 .TP
 .BI \-u " tree parent child"
 Unlink
