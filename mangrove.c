@@ -1,6 +1,5 @@
 /* See LICENSE for license details. */
 #include <sys/cdefs.h>
-#include <sys/stat.h>
 #include <sys/types.h>
 
 #include <dirent.h>
@@ -32,7 +31,7 @@ static int	enabletree(char *);
 static int	fetchtrees(void);
 static int	gettreebyname(char *);
 static int	islink(int, int, int);
-static int	mkill(int);
+static int	mkill(int); 
 static int	listlink(char *);
 static int 	newtree(char *);
 static int 	pidstat(char *, int);
@@ -316,19 +315,24 @@ islink(int tindex, int parent, int child)
 static int
 mkill(int pid)
 {
+	/* 
+ 	 * function name "mkill" for "mangrove kill"
+ 	 * (because kill() is already defined in signal.h)
+ 	 */
 	int killed[MAX_TREES_NUMBER * MAX_LINKS_NUMBER];
 	int killednb = 0;
 	int i, j, k, l; 
 
 	kill(pid, SIGKILL);
 	killed[killednb] = pid;
+	printf("%d\n", pid);
 	killednb++;
 	for (i = 0; i < treesnb; i++) {
 		/* ignore disabled trees */
 		if (!trees[i].enable)
 			continue;
 		for (j = 0; j < trees[i].linksnumber; j++)
-			for (k = 0; k < killednb; k++)
+			for (k = 0; k < killednb; k++) {
 			/*
 			 * if the link between the last killed 
 			 * pid and trees[i].links[j][1] exists
@@ -337,9 +341,11 @@ mkill(int pid)
 			 * the following block is not indented because
 			 * trying to respect 80 characters maximum lines.
 			 */
-			if (!islink(i, killed[k], trees[i].links[j][1])) {
-				kill(trees[i].links[j][1], SIGKILL);
-				killed[killednb] = trees[i].links[j][1];
+			pid = trees[i].links[j][1];
+			if (!islink(i, killed[k], pid)) {
+				kill(pid, SIGKILL);
+				printf("%d\n", pid);
+				killed[killednb] = pid;
 				killednb++;
 				memset(trees[i].links[j], 0, 2 * sizeof(int));
 				/* 
@@ -347,8 +353,9 @@ mkill(int pid)
 				 * trees[i].links[j][1] is a child
 				 */
 				for (l = 0; l < trees[i].linksnumber; l++)
-					if (trees[i].links[l][1] == trees[i].links[j][1])
+					if (trees[i].links[l][1] == pid)
 						memset(trees[i].links[l], 0, 2 * sizeof(int));
+			}
 			}
 	}
 	return 0;
