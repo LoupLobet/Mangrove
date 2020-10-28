@@ -1,23 +1,25 @@
 #ifndef _UTIL_H_
 #define _UTIL_H_
 
-/* 
- * manage bsd fonctionality for linux systems, such as
- * getprogname() or __dead prefix for dead functions 
- */
-#ifdef __linux__
-    #include <bsd/stdlib.h>    		     /* getprogname() for usage() */
-    #define __dead __attribute__((noreturn)) /* provide __dead functions */
+#ifndef __dead
+	#ifdef __linux__
+    		#include <bsd/stdlib.h>
+    		#define __dead __attribute__((noreturn))
+	#endif
+	#ifdef __FreeBSD__
+		#define __dead __dead2
+	#endif
 #endif
 
-/* 
- * arbitrary constants
- */
-#define MAX_LINKS_NUMBER 256
-#define MAX_TREES_NUMBER 256
-#define MAX_LINE_LENGTH  256
+#ifdef __OpenBSD__
+	#define PID_MAX 99999	/* since 6.5 */
+#endif
+#ifdef __FreeBSD__
+	#define PID_MAX 99999
+#endif
 
-/* symbol between pids in tree files */
-char *linksymbol = "\t-> ";
+__dead void	die(const char *, ...);
+void		*ecalloc(size_t nmemb, size_t size);
+int		estrtonum(char *string);
 
 #endif

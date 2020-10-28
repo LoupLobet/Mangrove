@@ -10,7 +10,7 @@ PREFIX = /usr/local
 MANPREFIX = ${PREFIX}/share/man
 
 # If you are using BSD comment next line 
-LINUX = -lbsd
+# LINUX = -lbsd
 
 # flags
 CPPFLAGS = -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=2 -DVERSION=\"${VERSION}\"
