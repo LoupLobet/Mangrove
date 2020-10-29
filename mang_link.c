@@ -43,7 +43,7 @@ static int vflag, cflag, bflag;
 static int rval;
 
 static void		cook_args(char **);
-static void		cook_stdin(int **, int *);
+static void		cook_stdin(int **, int *, char **);
 static void		link_pids(int *);
 
 int
@@ -87,6 +87,7 @@ cook_args(char **argv)
 	int readstdin = 1;
 	int size;
 	int *pids = NULL;
+	char *tpath = NULL;
 	const char *errstr = NULL;
 
 	size = 0;
@@ -96,22 +97,31 @@ cook_args(char **argv)
 				readstdin = 1;
 			} else {
 				readstdin = 0;
-				if ((pids = realloc(pids, (size + 1) * sizeof(int))) == NULL)
-					die("%s: Error on allocating blocks", __progname);
-				pids[size] = strtonum(*argv, INT_MIN, INT_MAX, &errstr);
-				if (errstr != NULL)
-					die("%s: Error illegal integer: %s", __progname, *argv);
-				size++;
+				if (tpath == NULL) {
+					tpath = ecalloc(strlen(*argv) + 1, sizeof(char));
+					strcpy(tpath, *argv);
+				} else {
+					if ((pids = realloc(pids, (size + 1) * sizeof(int))) == NULL)
+						die("%s: Error on allocating blocks", __progname);
+					pids[size] = strtonum(*argv, INT_MIN, INT_MAX, &errstr);
+					if (errstr != NULL)
+						die("%s: Error illegal integer: %s", __progname, *argv);
+					size++;
+				}
 			}
 			argv++;
 		}
 		if (readstdin)
-			cook_stdin(&pids, &size);
+			cook_stdin(&pids, &size, &tpath);
 	} while (*argv);
+	printf("%s\n", tpath);
+	for (int i = 0; i < size; i++) {
+		printf("%d\n", pids[i]);
+	}
 }
 
 static void
-cook_stdin(int **pids, int *size)
+cook_stdin(int **pids, int *size, char **tree)
 {
 	int i;
 	char ch;
@@ -124,14 +134,19 @@ cook_stdin(int **pids, int *size)
 		if ((buf = realloc(buf, i + 1)) == NULL)
 			die("%s: Error on allocating blocks", __progname);
 		if ((ch == ' ') || (ch == '\n')) {
-			if ((*pids = realloc(*pids, (*size + 1) * sizeof(int))) == NULL)
-				die("%s: Error on allocating blocks", __progname);
-			(*pids)[*size] = strtonum(buf, INT_MIN, INT_MAX, &errstr);
-			if (errstr != NULL)
-				die("%s: Error illegal integer: %s", __progname, buf);
-			(*size)++;
+			if (*tree == NULL) {
+				*tree = ecalloc(strlen(buf) + 1, sizeof(char));
+				strcpy(*tree, buf);
+				buf = NULL;
+			} else {
+				if ((*pids = realloc(*pids, (*size + 1) * sizeof(int))) == NULL)
+					die("%s: Error on allocating blocks", __progname);
+				(*pids)[*size] = strtonum(buf, INT_MIN, INT_MAX, &errstr);
+				if (errstr != NULL)
+					die("%s: Error illegal integer: %s", __progname, buf);
+				(*size)++;
+			}
 			i = -1;
-
 		} else
 			buf[i] = ch;
 	}
