@@ -93,9 +93,9 @@ cook_args(char **argv)
 	readstdin = 1;
 	 do {
 	 	if (*argv) {
-			if (!strcmp(*argv, "-")) {
+			if (!strcmp(*argv, "-"))
 				readstdin = 1;
-			} else {
+			else {
 				readstdin = 0;
 				new_tree(*argv);
 			}
