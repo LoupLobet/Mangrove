@@ -9,7 +9,7 @@ CC = cc
 PREFIX = /usr/local
 MANPREFIX = ${PREFIX}/share/man
 
-# If you are using BSD comment next line 
+# If you are using BSD comment next line
 # LINUX = -lbsd
 
 # flags
