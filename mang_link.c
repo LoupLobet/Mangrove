@@ -184,7 +184,7 @@ link_pids(char * tpath, int *pids, int size)
 {
 	struct stat fstat;
 	int i;
-	FILE *tp;
+	FILE *tp = NULL;
 
 	if ((access(tpath, F_OK)) == -1)
 			errx(1, "No such file or directory: %s", tpath);
