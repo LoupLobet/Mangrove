@@ -198,4 +198,5 @@ link_pids(char * tpath, int *pids, int size)
 		else
 			errx(1, "Error in opening file: %s", tpath);
 	}
+	fclose(tp);
 }
