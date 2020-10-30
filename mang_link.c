@@ -30,6 +30,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <err.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,7 +45,7 @@ static int rval;
 
 static void		cook_args(char **);
 static void		cook_stdin(int **, int *, char **);
-static void		link_pids(int *);
+static void		link_pids(char *, int *, int);
 
 int
 main(int argc, char *argv[])
@@ -114,10 +115,7 @@ cook_args(char **argv)
 		if (readstdin)
 			cook_stdin(&pids, &size, &tpath);
 	} while (*argv);
-	printf("%s\n", tpath);
-	for (int i = 0; i < size; i++) {
-		printf("%d\n", pids[i]);
-	}
+	link_pids(tpath, pids, size);
 }
 
 static void
@@ -153,7 +151,35 @@ cook_stdin(int **pids, int *size, char **tree)
 }
 
 static void
-link_pids(int *pids)
+link_pids(char * tpath, int *pids, int size)
 {
+	char *fmt[] = { "%d\t%d\n", "%d\t%d\n%d\t%d\n" };
+	char *vfmt[] = { "%d -> %d\n", "%d -> %d\n%d -> %d\n" };
+	struct stat fstat;
+	int i;
+	FILE *tp;
 
+	if ((access(tpath, F_OK)) == -1)
+			errx(1, "No such file or directory: %s", tpath);
+	lstat(tpath, &fstat);
+	if (errno == ENOENT)
+		errx(1, "Error in obtaining information about file: %s", tpath);
+	if (S_ISREG(fstat.st_mode)) {
+		if ((tp = fopen(tpath, "a+")) != NULL) {
+			for (i = 0; i < size - 1; i++) {
+				if (bflag)
+					fprintf(tp, fmt[1], pids[cflag * i], pids[i + 1], pids[i + 1], pids[cflag * i]);
+				else
+					fprintf(tp, fmt[0], pids[cflag * i], pids[i + 1]);
+				if (vflag && bflag)
+					fprintf(stdout, vfmt[1], pids[cflag * i], pids[i + 1], pids[i + 1], pids[cflag * i]);
+				else if (vflag && !bflag)
+					fprintf(stdout, vfmt[0], pids[cflag * i], pids[i + 1]);
+				if (ferror(stdout))
+					errx(1, "Error in printing on stdout");
+			}
+		} else {
+			warn("%s", __progname);
+		}
+	}
 }
