@@ -39,11 +39,14 @@
 
 #include "util.h"
 
+#define SWAP(X,Y, BUF)	do { BUF = X; X = Y; Y = BUF; } while (0);
+
 extern char *__progname;
-static int vflag, cflag, bflag;
+static int vflag, cflag, bflag, rflag;
 static int rval;
 
 static void		cook_args(char **);
+static void		cook_link(FILE *, int *, int);
 static void		cook_stdin(int **, int *, char **);
 static void		link_pids(char *, int *, int);
 
@@ -60,7 +63,7 @@ main(int argc, char *argv[])
 		die("%s: Can't fetch current directory", __progname);
 	}
 
-	while ((ch = getopt(argc, argv, "vcb")) != -1) {
+	while ((ch = getopt(argc, argv, "vcbr")) != -1) {
 		switch (ch) {
 		case 'v':
 			vflag = 1;
@@ -70,6 +73,9 @@ main(int argc, char *argv[])
 			break;
 		case 'b':
 			bflag = 1;
+			break;
+		case 'r':
+			rflag = 1;
 			break;
 		default:
 			(void)fprintf(stdout, "usage: %s [-v] [tree ...]\n", __progname);
@@ -119,6 +125,29 @@ cook_args(char **argv)
 }
 
 static void
+cook_link(FILE *tp, int *pids, int i)
+{
+	int parent, child, buf;
+
+	parent = pids[i * cflag];
+	child = pids[i + 1];
+	if (rflag)
+		SWAP(parent, child, buf);
+	fprintf(tp, "%d\t%d\n", parent, child);
+	if (vflag)
+		fprintf(stdout, "%d -> %d\n", parent, child);
+	if (bflag) {
+		bflag = !bflag;
+		rflag = !rflag;
+		cook_link(tp, pids, i);
+		bflag = !bflag;
+		rflag = !rflag;
+	}
+	if (ferror(stdout))
+		warnx("Error in printing on stdout");
+}
+
+static void
 cook_stdin(int **pids, int *size, char **tree)
 {
 	int i;
@@ -153,8 +182,6 @@ cook_stdin(int **pids, int *size, char **tree)
 static void
 link_pids(char * tpath, int *pids, int size)
 {
-	char *fmt[] = { "%d\t%d\n", "%d\t%d\n%d\t%d\n" };
-	char *vfmt[] = { "%d -> %d\n", "%d -> %d\n%d -> %d\n" };
 	struct stat fstat;
 	int i;
 	FILE *tp;
@@ -165,21 +192,10 @@ link_pids(char * tpath, int *pids, int size)
 	if (errno == ENOENT)
 		errx(1, "Error in obtaining information about file: %s", tpath);
 	if (S_ISREG(fstat.st_mode)) {
-		if ((tp = fopen(tpath, "a+")) != NULL) {
-			for (i = 0; i < size - 1; i++) {
-				if (bflag)
-					fprintf(tp, fmt[1], pids[cflag * i], pids[i + 1], pids[i + 1], pids[cflag * i]);
-				else
-					fprintf(tp, fmt[0], pids[cflag * i], pids[i + 1]);
-				if (vflag && bflag)
-					fprintf(stdout, vfmt[1], pids[cflag * i], pids[i + 1], pids[i + 1], pids[cflag * i]);
-				else if (vflag && !bflag)
-					fprintf(stdout, vfmt[0], pids[cflag * i], pids[i + 1]);
-				if (ferror(stdout))
-					errx(1, "Error in printing on stdout");
-			}
-		} else {
-			warn("%s", __progname);
-		}
+		if ((tp = fopen(tpath, "a+")) != NULL)
+			for (i = 0; i < (size - 1); i++)
+				cook_link(tp, pids, i);
+		else
+			errx(1, "Error in opening file: %s", tpath);
 	}
 }
