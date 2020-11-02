@@ -1,6 +1,6 @@
 include config.mk
 
-all: clean options mang_open mang_new mang_del mang_link clean_object
+all: clean options mang_open mang_new mang_del mang_link mang_ulink clean_object
 
 options:
 	@echo mangrove build options:
@@ -22,11 +22,14 @@ mang_del: mang_del.o util.o
 mang_link: mang_link.o util.o
 	${CC} -o $@ mang_link.o util.o ${CLFAGS}
 
+mang_ulink: mang_ulink.o util.o
+	${CC} -o $@ mang_ulink.o util.o ${CLFAGS}
+
 clean_object:
-	rm -f mang_open.o mang_new.o mang_del.o mang_link.o util.o
+	rm -f mang_open.o mang_new.o mang_del.o mang_link.o mang_ulink.o util.o
 
 clean:
-	rm -f mang_open mang_new mang_del mang_link mang_open.o mang_new.o mang_del.o mang_link.o util.o
+	rm -f mang_open mang_new mang_del mang_link mang_ulink mang_open.o mang_new.o mang_del.o mang_link.o mang_link.o util.o
 
 install: all
 	mkdir -p ${DESTDIR}${PREFIX}/bin
