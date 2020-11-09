@@ -38,7 +38,7 @@
 #include "util.h"
 
 extern char *__progname;
-static int vflag;
+static int vflag, rflag;
 static int rval;
 
 static void		cook_args(char **);
@@ -62,6 +62,9 @@ main(int argc, char *argv[])
 		switch (ch) {
 		case 'v':
 			vflag = 1;
+			break;
+		case 'r':
+			rflag = 1;
 			break;
 		default:
 			(void)fprintf(stdout, "usage: %s [-v] [tree ...]\n", __progname);
@@ -144,7 +147,10 @@ open_tree(FILE *fp, char *tname)
 				if (ferror(fp))
 					warn("%s", __progname);
 				clearerr(fp);
-				fprintf(stdout, "%c", ch);
+				if ((ch == '\t') && !rflag)
+					fprintf(stdout, " -> ");
+				else
+					fprintf(stdout, "%c", ch);
 				if (ferror(stdout))
 					die("%s: %c: Error on printing on stdout");
 			} while ((ch  = getc(fp)) != EOF);
