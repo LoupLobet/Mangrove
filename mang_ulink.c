@@ -206,6 +206,7 @@ ulink_pids(char * tpath, int *pids, int size)
 	char *buf = NULL;
 	FILE *rtp = NULL, *wtp = NULL;
 
+	/* prevent editing an unregular file */
 	if ((access(tpath, F_OK)) == -1)
 			errx(1, "No such file or directory: %s", tpath);
 	lstat(tpath, &fstat);
@@ -214,6 +215,10 @@ ulink_pids(char * tpath, int *pids, int size)
 	if (S_ISREG(fstat.st_mode)) {
 		if ((rtp = fopen(tpath, "r")) == NULL)
 			errx(1, "Error in opening file for reading: %s", tpath);
+		/* 
+		  * Read the file (rtp), and write each inchanged lines into a buffer, 
+		  * then in the tree file (wtp).
+		  */
 		for (i = 0; (ch = getc(rtp)) != EOF; i++) {
 			if ((line = realloc(line, i + 1)) == NULL)
 				errx(1, "Error in hhallocating blocks");
@@ -225,6 +230,8 @@ ulink_pids(char * tpath, int *pids, int size)
 					if ((buf = realloc(buf, bufsize)) == NULL)
 						errx(1, "Error in allocating blocks");
 					strcat(buf, line);
+				} else if (vflag) {
+					fprintf(stdout, "%s", line);
 				}
 				line = NULL;
 				i = -1;
@@ -234,6 +241,8 @@ ulink_pids(char * tpath, int *pids, int size)
 		fclose(rtp);
 		if ((wtp = fopen(tpath, "w")) == NULL)
 			errx(1, "Error in opening file for writing: %s", tpath);
+		if (buf)
+			fprintf(wtp, "%s", buf);
 		fclose(wtp);
 	}
 }
