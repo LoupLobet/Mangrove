@@ -46,7 +46,7 @@ static int rval;
 static void		cook_args(char **);
 static void		cook_stdin(int **, int *, char **);
 static int		delete_line(int, int, int *, int);
-static void		fetch_pids(char *, int *, int *);
+static void		read_link(char *, int *, int *);
 static void		ulink_pids(char *, int *, int);
 
 int
@@ -174,7 +174,7 @@ delete_line(int parent, int child, int *pids, int size)
 
 
 static void
-fetch_pids(char *line, int *parent, int *child)
+read_link(char *line, int *parent, int *child)
 {
 
 	const char *errstr = NULL;
@@ -224,7 +224,7 @@ ulink_pids(char * tpath, int *pids, int size)
 				errx(1, "Error in hhallocating blocks");
 			if (ch == '\n') {
 				line[i] = ch;
-				fetch_pids(line, &parent, &child);
+				read_link(line, &parent, &child);
 				if (!delete_line(parent, child, pids, size)) {
 					bufsize += 1;
 					if ((buf = realloc(buf, bufsize)) == NULL)
