@@ -180,7 +180,7 @@ cook_stdin(int **pids, int *size, char **tree)
 }
 
 static void
-link_pids(char * tpath, int *pids, int size)
+link_pids(char *tpath, int *pids, int size)
 {
 	struct stat fstat;
 	int i;
@@ -197,6 +197,7 @@ link_pids(char * tpath, int *pids, int size)
 				cook_link(tp, pids, i);
 		else
 			errx(1, "Error in opening file: %s", tpath);
-	}
+	} else
+		errx (1, "Error: %s is not a regular file");
 	fclose(tp);
 }
