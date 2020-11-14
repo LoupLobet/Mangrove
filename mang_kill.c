@@ -32,6 +32,7 @@
 #include <err.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -201,8 +202,8 @@ kill_pids(char *tpath, int *pids, int size)
 				line[i] = ch;
 				read_link(line, &parent, &child);
 				/* 
-				 * rewind and restart the loop taking
-				 * care of last killed pid.
+				 * if a new pid is added to the kill list
+				 * (kpids), rewind and restart reading.
 				 */
 				if (cook_kill(parent, child, &kpids, &ksize))
 					rewind(tp);
@@ -215,8 +216,12 @@ kill_pids(char *tpath, int *pids, int size)
 	} else
 		errx(1, "Error: %s is not a regular file", tpath);
 	fclose(tp);
-	for (i = 0; i < ksize; i++)
-		fprintf(stdout, "%d\n", kpids[i]);
+	for (i = 0; i < ksize; i++) {
+		if (!kill(kpids[i], SIGKILL))
+			fprintf(stdout, "%d\n", kpids[i]);
+		else
+			warn("%s", __progname);
+	}
 }
 
 static void
