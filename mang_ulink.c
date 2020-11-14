@@ -221,7 +221,7 @@ ulink_pids(char * tpath, int *pids, int size)
 		  */
 		for (i = 0; (ch = getc(rtp)) != EOF; i++) {
 			if ((line = realloc(line, i + 1)) == NULL)
-				errx(1, "Error in hhallocating blocks");
+				errx(1, "Error in allocating blocks");
 			if (ch == '\n') {
 				line[i] = ch;
 				read_link(line, &parent, &child);

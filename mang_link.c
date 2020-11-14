@@ -198,6 +198,6 @@ link_pids(char *tpath, int *pids, int size)
 		else
 			errx(1, "Error in opening file: %s", tpath);
 	} else
-		errx (1, "Error: %s is not a regular file");
+		errx (1, "Error: %s is not a regular file", tpath);
 	fclose(tp);
 }
