@@ -77,7 +77,7 @@ main(int argc, char *argv[])
 			zflag = 1;
 			break;
 		default:
-			(void)fprintf(stdout, "usage: %s [-vpc] tree [pid ...]\n", __progname);
+			(void)fprintf(stdout, "usage: %s [-vpcz] tree [pid ...]\n", __progname);
 			return 1;
 		}
 	}

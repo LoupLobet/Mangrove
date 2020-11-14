@@ -69,7 +69,7 @@ main(int argc, char *argv[])
 			vflag = 1;
 			break;
 		default:
-			(void)fprintf(stdout, "usage: %s [-vcbr] tree [pid ...]\n", __progname);
+			(void)fprintf(stdout, "usage: %s [-v] tree [pid ...]\n", __progname);
 			return 1;
 		}
 	}

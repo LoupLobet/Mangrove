@@ -67,7 +67,7 @@ main(int argc, char *argv[])
 			rflag = 1;
 			break;
 		default:
-			(void)fprintf(stdout, "usage: %s [-v] [tree ...]\n", __progname);
+			(void)fprintf(stdout, "usage: %s [-vr] [tree ...]\n", __progname);
 			return 1;
 		}
 	}
