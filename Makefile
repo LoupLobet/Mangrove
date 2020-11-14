@@ -37,7 +37,13 @@ install: all
 #	ln -fs ${DESTDIR}${MANPREFIX}/man1/mangrove.1 ${DESTDIR}${MANPREFIX}/man1/mang.1
 
 uninstall:
-	rm -f ${DESTDIR}${PREFIX}/bin/mang
+	rm -f ${DESTDIR}${PREFIX}/bin/mang_new \
+	rm -f ${DESTDIR}${PREFIX}/bin/mang_open \
+	rm -f ${DESTDIR}${PREFIX}/bin/mang_del \
+	rm -f ${DESTDIR}${PREFIX}/bin/mang_link \
+	rm -f ${DESTDIR}${PREFIX}/bin/mang_ulink \
+	rm -f ${DESTDIR}${PREFIX}/bin/mang_kill \
+
 #	${DESTDIR}${MANPREFIX}/man1/mangrove.1 \
 #	${DESTDIR}${MANPREFIX}/man1/mang.1
 
