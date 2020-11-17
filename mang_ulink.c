@@ -108,7 +108,7 @@ cook_args(char **argv)
 					strcpy(tpath, *argv);
 				} else {
 					if ((pids = realloc(pids, (size + 1) * sizeof(int))) == NULL)
-						errx(1, "Error on allocating blocks");
+						err(1, NULL);
 					pids[size] = strtonum(*argv, INT_MIN, INT_MAX, &errstr);
 					if (errstr != NULL)
 						errx(1, "Error illegal integer: %s", *argv);
@@ -137,7 +137,7 @@ cook_stdin(int **pids, int *size, char **tree)
 	rfd = stdin;
 	for (i = 0; (ch = getc(rfd)) != EOF; i++) {
 		if ((buf = realloc(buf, i + 1)) == NULL)
-			errx(1, "Error in allocating blocks");
+			err(1, NULL);
 		if ((ch == ' ') || (ch == '\n')) {
 			if (*tree == NULL) {
 				*tree = ecalloc(strlen(buf) + 1, sizeof(char));
@@ -145,7 +145,7 @@ cook_stdin(int **pids, int *size, char **tree)
 				buf = NULL;
 			} else {
 				if ((*pids = realloc(*pids, (*size + 1) * sizeof(int))) == NULL)
-					errx(1, "Error on allocating blocks");
+					err(1, NULL);
 				(*pids)[*size] = strtonum(buf, INT_MIN, INT_MAX, &errstr);
 				if (errstr != NULL)
 					errx(1, "Error illegal integer: %s", buf);
@@ -225,14 +225,14 @@ ulink_pids(char * tpath, int *pids, int size)
 		  */
 		for (i = 0; (ch = getc(rtp)) != EOF; i++) {
 			if ((line = realloc(line, i + 1)) == NULL)
-				errx(1, "Error in allocating blocks");
+				err(1, NULL);
 			if (ch == '\n') {
 				line[i] = ch;
 				read_link(line, &parent, &child);
 				if (!delete_line(parent, child, pids, size)) {
 					bufsize += 1;
 					if ((buf = realloc(buf, bufsize)) == NULL)
-						errx(1, "Error in allocating blocks");
+						err(1, NULL);
 					strcat(buf, line);
 				} else if (vflag) {
 					fprintf(stdout, "%s", line);

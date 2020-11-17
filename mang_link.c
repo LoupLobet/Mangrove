@@ -109,7 +109,7 @@ cook_args(char **argv)
 					strcpy(tpath, *argv);
 				} else {
 					if ((pids = realloc(pids, (size + 1) * sizeof(int))) == NULL)
-						errx(1, "Error on allocating blocks");
+						err(1, NULL);
 					pids[size] = strtonum(*argv, INT_MIN, INT_MAX, &errstr);
 					if (errstr != NULL)
 						errx(1, "Error illegal integer: %s", *argv);
@@ -161,7 +161,7 @@ cook_stdin(int **pids, int *size, char **tree)
 	rfd = stdin;
 	for (i = 0; (ch = getc(rfd)) != EOF; i++) {
 		if ((buf = realloc(buf, i + 1)) == NULL)
-			errx(1, "Error on allocating blocks");
+			err(1, NULL);
 		if ((ch == ' ') || (ch == '\n')) {
 			if (*tree == NULL) {
 				*tree = ecalloc(strlen(buf) + 1, sizeof(char));
@@ -169,7 +169,7 @@ cook_stdin(int **pids, int *size, char **tree)
 				buf = NULL;
 			} else {
 				if ((*pids = realloc(*pids, (*size + 1) * sizeof(int))) == NULL)
-					errx(1, "Error on allocating blocks");
+					err(1, NULL);
 				(*pids)[*size] = strtonum(buf, INT_MIN, INT_MAX, &errstr);
 				if (errstr != NULL)
 					errx(1, "Error illegal integer: %s", buf);

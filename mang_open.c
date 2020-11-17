@@ -117,7 +117,7 @@ cook_stdin(void)
 	rfd = stdin;
 	for (i = 0; (ch = getc(rfd)) != EOF; i++) {
 		if ((filename = realloc(filename, i + 1)) == NULL)
-			errx(1, "Error on allocating blocks");
+			err(1, NULL);
 		if ((ch == ' ') || (ch == '\n')) {
 			if ((wfd = fopen(filename, "r")) == NULL)
 				errx(1, "Error in opening file: %s", filename);
