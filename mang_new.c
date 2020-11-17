@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
 			permissions += 0002;
 			break;
 		default:
-			(void)fprintf(stdout, "usage: %s [-vugo] [tree ...]\n", __progname);
+			(void)fprintf(stdout, "usage: %s [-gouv] [tree ...]\n", __progname);
 			return 1;
 		}
 	}
