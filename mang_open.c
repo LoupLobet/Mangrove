@@ -53,9 +53,9 @@ main(int argc, char *argv[])
 
 	if ((getcwd(cwd, sizeof(cwd))) != NULL) {
 		if (chdir(cwd) == -1)
-			die("%s: Can't move to current directory: %s", __progname, cwd);
+			errx(1, "Can't move to current directory: %s", cwd);
 	} else {
-		die("%s: Can't fetch current directory", __progname);
+		errx(1, "Can't fetch current directory");
 	}
 
 	while ((ch = getopt(argc, argv, "rv")) != -1) {
@@ -117,10 +117,10 @@ cook_stdin(void)
 	rfd = stdin;
 	for (i = 0; (ch = getc(rfd)) != EOF; i++) {
 		if ((filename = realloc(filename, i + 1)) == NULL)
-			die("%s: Error on allocating blocks", __progname);
+			errx(1, "Error on allocating blocks");
 		if ((ch == ' ') || (ch == '\n')) {
 			if ((wfd = fopen(filename, "r")) == NULL)
-				die("%s: Error in opening file: %s", __progname, filename);
+				errx(1, "Error in opening file: %s", filename);
 			open_tree(wfd, filename);
 			fclose(wfd);
 			i = -1;
@@ -153,7 +153,7 @@ open_tree(FILE *fp, char *tname)
 				else
 					fprintf(stdout, "%c", ch);
 				if (ferror(stdout))
-					die("%s: %c: Error on printing on stdout");
+					errx(1, "Error on printing on stdout");
 			} while ((ch  = getc(fp)) != EOF);
 		}
 	}

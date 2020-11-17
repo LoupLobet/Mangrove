@@ -53,9 +53,9 @@ int main(int argc, char *argv[])
 
 	if ((getcwd(cwd, sizeof(cwd))) != NULL) {
 		if (chdir(cwd) == -1)
-			die("%s: Can't move to current directory: %s", __progname, cwd);
+			errx(1, "Can't move to current directory: %s", cwd);
 	} else {
-		die("%s: Can't fetch current directory", __progname);
+		errx(1, "Can't fetch current directory");
 	}
 
 	while ((ch = getopt(argc, argv, "v")) != -1) {
@@ -106,7 +106,7 @@ cook_stdin(void)
 	rfd = stdin;
 	for (i = 0; (ch = getc(rfd)) != EOF; i++) {
 		if ((path = realloc(path, i + 1)) == NULL)
-			die("%s: Error on allocating blocks", __progname);
+			errx(1, "Error on allocating blocks");
 		if ((ch == ' ') || (ch == '\n')) {
 			del_tree(path);
 			i = -1;
@@ -123,12 +123,12 @@ del_tree(char *path)
 
 	lstat(path, &fstat);
 	if (errno == ENOENT)
-		die("%s: Error in obtaining information about file: %s", __progname, path);
+		errx(1, "Error in obtaining information about file: %s", path);
 	if (S_ISREG(fstat.st_mode)) {
 		if (remove(path) != 0) {
-			die("%s: Error can't remove specified tree: %s", __progname, path);
+			errx(1, "Error can't remove specified tree: %s", path);
 		} else if (vflag)
 			fprintf(stdout, "%s\n", path);
 	} else
-		die("%s: Error wrong object type: %s is not a regular file", __progname, path);
+		errx(1, "Error wrong object type: %s is not a regular file", path);
 }

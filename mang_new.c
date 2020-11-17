@@ -54,9 +54,9 @@ int main(int argc, char *argv[])
 
 	if ((getcwd(cwd, sizeof(cwd))) != NULL) {
 		if (chdir(cwd) == -1)
-			die("%s: Can't move to current directory: %s", __progname, cwd);
+			errx(1, "Can't move to current directory: %s", cwd);
 	} else {
-		die("%s: Can't fetch current directory", __progname);
+		errx(1, "Can't fetch current directory");
 	}
 
 	permissions = 0444;
@@ -117,7 +117,7 @@ cook_stdin(void)
 	rfd = stdin;
 	for (i = 0; (ch = getc(rfd)) != EOF; i++) {
 		if ((path = realloc(path, i + 1)) == NULL)
-			die("%s: Error on allocating blocks", __progname);
+			errx(1, "Error on allocating blocks");
 		if ((ch == ' ') || (ch == '\n')) {
 			new_tree(path);
 			i = -1;
