@@ -124,6 +124,7 @@ cook_stdin(void)
 		} else
 			path[i] = ch;
 	}
+	free(path);
 }
 
 static void

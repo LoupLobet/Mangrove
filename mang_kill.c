@@ -113,6 +113,8 @@ cook_args(char **argv)
 			cook_stdin(&pids, &size, &tpath);
 	} while (*argv);
 	kill_pids(tpath, pids, size);
+	free(tpath);
+	free(pids);
 }
 
 static int
@@ -168,6 +170,7 @@ cook_stdin(int **pids, int *size, char **tree)
 		} else
 			buf[i] = ch;
 	}
+	free(buf);
 }
 
 static void
@@ -186,7 +189,6 @@ kill_pids(char *tpath, int *pids, int size)
 	if (errno == ENOENT)
 		errx(1, "Error in obtaining information about file: %s", tpath);
 	if (S_ISREG(fstat.st_mode)) {
-		 
 		ksize = size;
 		kpids = ecalloc(1, sizeof(int));
 		/* copy all pids (from cmdline) in kpids */
@@ -213,6 +215,8 @@ kill_pids(char *tpath, int *pids, int size)
 				line[i] = ch;
 		}
 		fclose(tp);
+		free(kpids);
+		free(line);
 	} else
 		errx(1, "Error: %s is not a regular file", tpath);
 	fclose(tp);
@@ -244,5 +248,6 @@ read_link(char *line, int *parent, int *child)
 	*child = strtonum(token, INT_MIN, INT_MAX, &errstr);
 	if (errstr != NULL)
 		errx(1, "Error invalid pid: %s", token);
+	free(linecpy);
 }
 

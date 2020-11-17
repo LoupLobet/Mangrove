@@ -127,6 +127,7 @@ cook_stdin(void)
 		} else
 			filename[i] = ch;
 	}
+	free(filename);
 }
 
 static void

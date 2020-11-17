@@ -121,6 +121,8 @@ cook_args(char **argv)
 			cook_stdin(&pids, &size, &tpath);
 	} while (*argv);
 	ulink_pids(tpath, pids, size);
+	free(tpath);
+	free(pids);
 }
 
 static void
@@ -153,6 +155,7 @@ cook_stdin(int **pids, int *size, char **tree)
 		} else
 			buf[i] = ch;
 	}
+	free(buf);
 }
 
 static int
@@ -194,6 +197,7 @@ read_link(char *line, int *parent, int *child)
 	*child = strtonum(token, INT_MIN, INT_MAX, &errstr);
 	if (errstr != NULL)
 		errx(1, "Error invalid pid: %s", token);
+	free(linecpy);
 }
 
 static void
@@ -244,5 +248,8 @@ ulink_pids(char * tpath, int *pids, int size)
 		if (buf)
 			fprintf(wtp, "%s", buf);
 		fclose(wtp);
+		free(line);
+		free(buf);
 	}
+
 }

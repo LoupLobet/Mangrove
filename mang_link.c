@@ -122,6 +122,8 @@ cook_args(char **argv)
 			cook_stdin(&pids, &size, &tpath);
 	} while (*argv);
 	link_pids(tpath, pids, size);
+	free(tpath);
+	free(pids);
 }
 
 static void
@@ -177,6 +179,7 @@ cook_stdin(int **pids, int *size, char **tree)
 		} else
 			buf[i] = ch;
 	}
+	free(buf);
 }
 
 static void
