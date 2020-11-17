@@ -42,7 +42,7 @@
 #define SWAP(X,Y, BUF)	do { BUF = X; X = Y; Y = BUF; } while (0);
 
 extern char *__progname;
-static int vflag, cflag, bflag, rflag;
+static int vflag, cflag, bflag, rflag, wflag;
 static int rval;
 
 static void		cook_args(char **);
@@ -63,7 +63,7 @@ main(int argc, char *argv[])
 		errx(1, "Can't fetch current directory");
 	}
 
-	while ((ch = getopt(argc, argv, "vcbr")) != -1) {
+	while ((ch = getopt(argc, argv, "wvcbr")) != -1) {
 		switch (ch) {
 		case 'v':
 			vflag = 1;
@@ -77,8 +77,11 @@ main(int argc, char *argv[])
 		case 'r':
 			rflag = 1;
 			break;
+		case 'w':
+			wflag = 1;
+			break;
 		default:
-			(void)fprintf(stdout, "usage: %s [-vcbr] tree [pid ...]\n", __progname);
+			(void)fprintf(stdout, "usage: %s [-bcrvw] tree [pid ...]\n", __progname);
 			return 1;
 		}
 	}
@@ -188,14 +191,20 @@ link_pids(char *tpath, int *pids, int size)
 	struct stat fstat;
 	int i;
 	FILE *tp = NULL;
+	char mode[3];
 
+	/* wflag overwrite links */
+	if(wflag)
+		strcpy(mode, "w+");
+	else
+		strcpy(mode, "a+");
 	if ((access(tpath, F_OK)) == -1)
 			errx(1, "No such file or directory: %s", tpath);
 	lstat(tpath, &fstat);
 	if (errno == ENOENT)
 		errx(1, "Error in obtaining information about file: %s", tpath);
 	if (S_ISREG(fstat.st_mode)) {
-		if ((tp = fopen(tpath, "a+")) != NULL)
+		if ((tp = fopen(tpath, mode)) != NULL)
 			for (i = 0; i < (size - 1); i++)
 				cook_link(tp, pids, i);
 		else
