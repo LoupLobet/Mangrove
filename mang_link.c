@@ -46,9 +46,9 @@ static int vflag, cflag, bflag, rflag, wflag;
 static int rval;
 
 static void		cook_args(char **);
-static void		cook_link(FILE *, int *, int);
-static void		cook_stdin(int **, int *, char **);
-static void		link_pids(char *, int *, int);
+static void		cook_link(int, int, FILE *);
+static void		cook_stdin(int *, int *, char **, int *);
+static void		link_pids(int, int, char *);
 
 int
 main(int argc, char *argv[])
@@ -96,7 +96,7 @@ cook_args(char **argv)
 {
 	int readstdin = 1;
 	int size;
-	int *pids = NULL;
+	int pidnb = 0, pid, parent, child;
 	char *tpath = NULL;
 	const char *errstr = NULL;
 
@@ -111,31 +111,39 @@ cook_args(char **argv)
 					tpath = ecalloc(strlen(*argv) + 1, sizeof(char));
 					strcpy(tpath, *argv);
 				} else {
-					if ((pids = realloc(pids, (size + 1) * sizeof(int))) == NULL)
-						err(1, NULL);
-					pids[size] = strtonum(*argv, INT_MIN, INT_MAX, &errstr);
+					pid = strtonum(*argv, INT_MIN, INT_MAX, &errstr);
 					if (errstr != NULL)
 						errx(1, "Error illegal integer: %s", *argv);
-					size++;
+					if (pidnb == 0)
+						parent = pid;
+					else if (pidnb == 1) {
+						child = pid;
+						link_pids(parent, child, tpath);
+					} else if (pidnb > 0) {
+						if (cflag) {
+							parent = child;
+							child = pid;
+						} else {
+							child = pid;
+						}
+						link_pids(parent, child, tpath);
+					}
+					pidnb++;
 				}
 			}
 			argv++;
 		}
 		if (readstdin)
-			cook_stdin(&pids, &size, &tpath);
+			cook_stdin(&parent, &child, &tpath, &pidnb);
 	} while (*argv);
-	link_pids(tpath, pids, size);
 	free(tpath);
-	free(pids);
 }
 
 static void
-cook_link(FILE *tp, int *pids, int i)
+cook_link(int parent, int child, FILE *tp)
 {
-	int parent, child, buf;
+	int buf;
 
-	parent = pids[i * cflag];
-	child = pids[i + 1];
 	if (rflag)
 		SWAP(parent, child, buf);
 	fprintf(tp, "%d\t%d\n", parent, child);
@@ -144,7 +152,7 @@ cook_link(FILE *tp, int *pids, int i)
 	if (bflag) {
 		bflag = !bflag;
 		rflag = !rflag;
-		cook_link(tp, pids, i);
+		cook_link(parent, child, tp);
 		bflag = !bflag;
 		rflag = !rflag;
 	}
@@ -153,9 +161,10 @@ cook_link(FILE *tp, int *pids, int i)
 }
 
 static void
-cook_stdin(int **pids, int *size, char **tree)
+cook_stdin(int *parent, int *child, char **tree, int *pidnb)
 {
 	int i;
+	int pid;
 	char ch;
 	char *buf = NULL;
 	const char *errstr = NULL;
@@ -171,12 +180,24 @@ cook_stdin(int **pids, int *size, char **tree)
 				strcpy(*tree, buf);
 				buf = NULL;
 			} else {
-				if ((*pids = realloc(*pids, (*size + 1) * sizeof(int))) == NULL)
-					err(1, NULL);
-				(*pids)[*size] = strtonum(buf, INT_MIN, INT_MAX, &errstr);
+				pid = strtonum(buf, INT_MIN, INT_MAX, &errstr);
 				if (errstr != NULL)
 					errx(1, "Error illegal integer: %s", buf);
-				(*size)++;
+				if (*pidnb == 0)
+					*parent = pid;
+				else if (*pidnb == 1) {
+					*child = pid;
+					link_pids(*parent, *child, *tree);
+				} else if (*pidnb > 0) {
+					if (cflag) {
+						*parent = *child;
+						*child = pid;
+					} else {
+						*child = pid;
+					}
+					link_pids(*parent, *child, *tree);
+				}
+				(*pidnb)++;
 			}
 			i = -1;
 		} else
@@ -186,10 +207,9 @@ cook_stdin(int **pids, int *size, char **tree)
 }
 
 static void
-link_pids(char *tpath, int *pids, int size)
+link_pids(int parent, int child, char *tpath)
 {
 	struct stat fstat;
-	int i;
 	FILE *tp = NULL;
 	char mode[3];
 
@@ -205,8 +225,7 @@ link_pids(char *tpath, int *pids, int size)
 		errx(1, "Error in obtaining information about file: %s", tpath);
 	if (S_ISREG(fstat.st_mode)) {
 		if ((tp = fopen(tpath, mode)) != NULL)
-			for (i = 0; i < (size - 1); i++)
-				cook_link(tp, pids, i);
+			cook_link(parent, child, tp);
 		else
 			errx(1, "Error in opening file: %s", tpath);
 	} else
