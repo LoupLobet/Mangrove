@@ -41,6 +41,7 @@
 #include <unistd.h>
 
 #define CONF_LINE_SIZE 2048
+#define CONF_FILE_PATH "/etc/mangd.conf"
 
 typedef struct {
 	char prt[KI_MAXCOMLEN];
@@ -95,7 +96,7 @@ diff_procs(void)
 	FILE *fp;
 	Snapshot *s = NULL;
 
-	if ((fp = fopen("/tmp/mang.conf", "r")) == NULL)
+	if ((fp = fopen(CONF_FILE_PATH, "r")) == NULL)
 		err(1, NULL);
 	if (((s = malloc(sizeof(Snapshot))) == NULL) ||
 	   ((s->next = malloc(sizeof(Snapshot))) == NULL))
