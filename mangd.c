@@ -40,6 +40,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#define CONF_LINE_SIZE 2048
+
 typedef struct {
 	char prt[KI_MAXCOMLEN];
 	char chd[KI_MAXCOMLEN];
@@ -172,7 +174,7 @@ read_config(FILE *fp, CfgLine *line)
 	 * is indeterminate, and should not be used.
 	 * Else 1 is returned on successfuk completion.
 	 */
-	static char buf[1024];
+	static char buf[CONF_LINE_SIZE];
 	int i, j, rval = 1;
 	char *p = NULL;
 
