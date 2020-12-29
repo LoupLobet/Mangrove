@@ -1,4 +1,4 @@
-VERSION = 0.1.3
+VERSION = 1.0
 CC = cc
 PREFIX = /usr/local
 MANPREFIX = ${PREFIX}/share/man
