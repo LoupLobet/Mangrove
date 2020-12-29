@@ -45,34 +45,25 @@ typedef struct {
 	char chd[KI_MAXCOMLEN];
 } CfgLine;
 
-typedef struct {
-	int size;
-	char **comms;
-	int *pids;
-} Diff;
-
 typedef struct Snapshot {
-	int size;
-	int *pids;
-	char **comms;
+	int entriesnb;
+	struct kinfo_proc *kinfo;
 	struct Snapshot *next;
+	kvm_t *kvmd;
 } Snapshot;
 
 extern char *__progname;
 int dflag, lflag;
-useconds_t usleeptime = 500;
+useconds_t refresh_rate = 100000; /* 0.1s */
 
-static int 	 diff_procs(kvm_t *);
-static int	 get_procs(kvm_t *, int **, char ***);
-static int	 kill_procs(kvm_t *, Diff, FILE *);
+static int 	 diff_procs(void);
+static int	 kill_procs(kvm_t *, Snapshot *, int, FILE *);
 static int	 read_config(FILE *, CfgLine *);
 
 int
 main(int argc, char *argv[])
 {
-	char errbuf[_POSIX2_LINE_MAX];
 	int ch;
-	kvm_t *kvmd = NULL;
 
 	if (pledge("stdio rpath proc ps", NULL) == -1)
 		err(1, "pledge");
@@ -89,59 +80,46 @@ main(int argc, char *argv[])
 			(void)fprintf(stdout, "usage: %s [-dl] [-i seconds]\n", __progname);
 		}
 	}
-	if ((kvmd = kvm_openfiles(NULL, NULL, NULL,
-	   KVM_NO_FILES, errbuf)) == NULL)
-		errx(1, "%s", errbuf);
-	diff_procs(kvmd);
+	diff_procs();
 	return 0;
 }
 
 static int
-diff_procs(kvm_t *kvmd)
+diff_procs(void)
 {
-	struct snapshot {
-		int size;
-		int *pids;
-		char **comms;
-		struct snapshot *next;
-	};
+	char errbuf[_POSIX2_LINE_MAX];
 	int i, j;
 	int missing;
 	FILE *fp;
 	Snapshot *s = NULL;
-	Diff d = { 0, NULL, NULL };
 
 	if ((fp = fopen("/tmp/mang.conf", "r")) == NULL)
 		err(1, NULL);
-	if (((s = malloc(sizeof(struct snapshot))) == NULL) ||
-	   ((s->next = malloc(sizeof(struct snapshot))) == NULL))
+	if (((s = malloc(sizeof(Snapshot))) == NULL) ||
+	   ((s->next = malloc(sizeof(Snapshot))) == NULL))
 		err(1, NULL);
 	s->next->next = s;
-	s->size = get_procs(kvmd, &(s->pids), &(s->comms));
-	while (usleep(usleeptime) == 0) {
-		d.size = 0;
-		s->next->size = get_procs(kvmd, &(s->next->pids),
-				                &(s->next->comms));
-		if (((d.pids = realloc(d.pids, s->size * sizeof(int))) == NULL)
-		|| ((d.comms = realloc(d.comms, s->size * sizeof(char *))) == NULL))
-			err(1, NULL);
-		for (i = 0; i < s->size; i++) {
-			missing = 1;
-			for (j = 0; j < s->next->size; j++) {
-				if (s->pids[i] == s->next->pids[j])
+
+	if ((s->kvmd = kvm_openfiles(NULL, NULL, NULL,
+	   KVM_NO_FILES, errbuf)) == NULL)
+		errx(1, "%s", errbuf);
+	if ((s->next->kvmd = kvm_openfiles(NULL, NULL, NULL,
+	   KVM_NO_FILES, errbuf)) == NULL)
+		errx(1, "%s", errbuf);
+	if ((s->kinfo = kvm_getprocs(s->kvmd, KERN_PROC_ALL, 0,
+	   sizeof(struct kinfo_proc), &(s->entriesnb))) == NULL)
+		errx(1, "Error can't get procs from kvm");
+	while (usleep(refresh_rate) == 0) {
+		if ((s->next->kinfo = kvm_getprocs(s->next->kvmd, KERN_PROC_ALL, 0,
+	   	   sizeof(struct kinfo_proc), &(s->next->entriesnb))) == NULL)
+			errx(1, "Error can't get procs from kvm");
+		for (i = 0; i < s->entriesnb; i++) {
+			for (j = 0, missing = 1; j < s->next->entriesnb; j++)
+				if (s->kinfo[i].p_pid == s->next->kinfo[j].p_pid)
 					missing = 0;
-			}
-			if (missing) {
-				if ((d.comms[d.size] = realloc(d.comms[d.size],
-				   KI_MAXCOMLEN)) == NULL)
-					err(1, NULL);
-				d.pids[d.size] = s->pids[i];
-				strlcpy(d.comms[d.size], s->comms[i], KI_MAXCOMLEN);
-				d.size++;
-			}
+			if (missing)
+				kill_procs(s->next->kvmd, s, i, fp);
 		}
-		if (d.size)
-			kill_procs(kvmd, d, fp);
 		s = s->next;
 	}
 	if (fclose(fp) != 0)
@@ -150,44 +128,21 @@ diff_procs(kvm_t *kvmd)
 }
 
 static int
-get_procs(kvm_t *kvmd, int **p_pids, char ***p_comms)
-{
-	int i, entriesnb = 0;
-	struct kinfo_proc *kinfo = NULL;
-
-	if ((kinfo = kvm_getprocs(kvmd, KERN_PROC_ALL, 0,
-	   sizeof(struct kinfo_proc), &entriesnb)) == NULL)
-		errx(1, "Error can't get procs from kvm");
-	if (((*p_pids = realloc(*p_pids, sizeof(int) * entriesnb)) == NULL) ||
-	   ((*p_comms = realloc(*p_comms, sizeof(char *) * entriesnb)) == NULL))
-		err(1, NULL);
-	for (i = 0; i < entriesnb; i++) {
-		if (((*p_comms)[i] = realloc((*p_comms)[i], KI_MAXCOMLEN)) == NULL)
-			err(1, NULL);
-		(*p_pids)[i] = kinfo[i].p_pid;
-		strlcpy((*p_comms)[i], kinfo[i].p_comm, KI_MAXCOMLEN);
-	}
-	return entriesnb;
-}
-
-static int
-kill_procs(kvm_t *kvmd, Diff d, FILE *fp)
+kill_procs(kvm_t *kvmd, Snapshot *s, int index, FILE *fp)
 {
 	CfgLine cfg;
 	int entriesnb;
 	struct kinfo_proc *kinfo = NULL;
-	int i, j;
+	int i;
 
 	if ((kinfo = kvm_getprocs(kvmd, KERN_PROC_ALL, 0,
 	   sizeof(struct kinfo_proc), &entriesnb)) == NULL)
 		errx(1, "Error can't get procs from kvm");
 	while (read_config(fp, &cfg) == 1) {
-		for (i = 0; i < d.size; i++) {
-			if (!(strcmp(cfg.prt, d.comms[i]))) {
-				for (j = 0; j < entriesnb; j++) {
-					if (!strcmp(kinfo[j].p_comm, cfg.chd))
-						kill(kinfo[j].p_pid, SIGKILL);
-				}
+		if (!(strcmp(cfg.prt, s->kinfo[index].p_comm))) {
+			for (i = 0; i < entriesnb; i++) {
+				if (!strcmp(kinfo[i].p_comm, cfg.chd))
+					kill(kinfo[i].p_pid, SIGKILL);
 			}
 		}
 	}
