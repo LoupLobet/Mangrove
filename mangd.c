@@ -41,7 +41,7 @@
 #include <unistd.h>
 
 #define CONF_LINE_SIZE 2048
-#define CONF_FILE_PATH "/etc/mangd.conf"
+#define MANGD_CONF_FILE "/etc/mangd.conf"
 
 typedef struct {
 	char prt[KI_MAXCOMLEN];
@@ -81,6 +81,7 @@ main(int argc, char *argv[])
 			break;
 		default:
 			(void)fprintf(stdout, "usage: %s [-dl] [-i seconds]\n", __progname);
+			return 1;
 		}
 	}
 	diff_procs();
@@ -96,8 +97,8 @@ diff_procs(void)
 	FILE *fp;
 	Snapshot *s = NULL;
 
-	if ((fp = fopen(CONF_FILE_PATH, "r")) == NULL)
-		err(1, NULL);
+	if ((fp = fopen(MANGD_CONF_FILE, "r")) == NULL)
+		errx(1, "could not open config file %s", MANGD_CONF_FILE);
 	if (((s = malloc(sizeof(Snapshot))) == NULL) ||
 	   ((s->next = malloc(sizeof(Snapshot))) == NULL))
 		err(1, NULL);
