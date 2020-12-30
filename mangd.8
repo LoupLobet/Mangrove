@@ -6,15 +6,15 @@ mangd \- Mangrove daemon.
 .RB [ \-d ]
 .SH DESCRIPTION
 .B mangd
-is the daemon profram for the the tool Mangrove.
+is the daemon profram for the the Mangrove tool.
 .B mangd
-listen process death through kernel virtual memory, and allow the user to kill
-some semanticly linked process, depending of the
+listens to process death through kernel virtual memory, and allows the user to kill
+some semanticly linked processes, depending of the
 .IR /etc/mangd.conf
 file.
 
 .B mangd
-read
+reads
 .IR /etc/mangd.conf continuously, so the configuration can be changed during
 runtime. The daemon can be configured easily with
 .B manglink(1) .
@@ -24,6 +24,6 @@ man page for configuration format.
 .SH OPTIONS
 .TP
 .B \-d
-Enable the debug mode (i.e. print warnigs and actions on the standard output)
+Enables the debug mode (i.e. print warnigs and logs on the standard output)
 .SH SEE ALSO
 manglink(1), mangd.conf(5)
