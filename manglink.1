@@ -1,0 +1,60 @@
+.TH MANGLINK 1 manglink\-VERSION
+.SH NAME
+manglink \- create formated links for mangd configuration file
+.SH SYNOPSIS
+.B manglink
+.RB [ \-bcr ]
+.RB [comm\ ...]
+.SH DESCRIPTION
+.B manglink
+is a complementary tool for the mangrove daemon, which take procs commands
+through command line or standard input, and print formatted
+.IR mangd(1)
+configuration link. The way given arguments are parsed, directly depends of
+passed options (cf 
+.IR OPTIONS
+section).
+.SH OPTIONS
+.TP
+.B \-b
+manglink writes the links bidirectionally. The \-b option override the \-r one.
+The links
+.BR foo <\-> bar
+will be considered as two separate links
+.BR foo \-> bar
+plus
+.BR bar \-> foo .
+.TP
+.B \-c
+manglink read given arguments in a chained way.
+.TP
+.B \-r
+manglink reverses each writen links.
+.SH USAGE
+manglink just write to standard output, but should be used by redirecting the
+output directly to
+.IR /etc/mangd.conf .
+.SH EXEMPLES
+Write links
+.BR foo \-> bar \-> baz
+to the standard output:
+
+	$ manglink -c foo bar baz
+
+Write links
+.BR foo \-> bar plus foo \-> baz
+to
+.IR /etc/mangd.conf:
+
+	$ manglink foo bar baz
+
+Write links
+.BR bar \-> foo
+plus
+.BR baz \-> foo
+to the standard output:
+
+	$ manglink -r foo bar baz
+
+.SH SEE ALSO
+mangd(1), mangd.conf(5)
