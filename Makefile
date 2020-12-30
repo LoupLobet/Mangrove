@@ -1,7 +1,7 @@
 VERSION = 1.0
 CC = cc
 PREFIX = /usr/local
-MANPREFIX = ${PREFIX}/share/man
+MANPREFIX = ${PREFIX}/man
 CPPFLAGS = -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=2 -DVERSION=\"${VERSION}\"
 CFLAGS = -std=c99 -pedantic -Wall -Os ${CPPFLAGS} ${LINUX}
 
@@ -29,15 +29,14 @@ install: all
 	mkdir -p ${DESTDIR}${PREFIX}/bin
 	cp -r manglink mangd ${DESTDIR}${PREFIX}/bin
 	chmod 755 ${DESTDIR}${PREFIX}/bin/manglink ${DESTDIR}${PREFIX}/bin/mangd
-#	mkdir -p ${DESTDIR}${MANPREFIX}/man1
-#	sed "s/VERSION/${VERSION}/g" < mangrove.1 > ${DESTDIR}${MANPREFIX}/man1/mangrove.1
+	#mkdir -p ${DESTDIR}${MANPREFIX}/man1
+	sed "s/VERSION/${VERSION}/g" < manglink.1 > ${DESTDIR}${MANPREFIX}/man1/manglink.1
 #	ln -fs ${DESTDIR}${MANPREFIX}/man1/mangrove.1 ${DESTDIR}${MANPREFIX}/man1/mang.1
 
 uninstall:
 	rm -f ${DESTDIR}${PREFIX}/bin/manglink
 	rm -f ${DESTDIR}${PREFIX}/bin/mangd
-
-#	${DESTDIR}${MANPREFIX}/man1/mangrove.1 \
+	rm -f ${DESTDIR}${MANPREFIX}/man1/manglink.1 
 #	${DESTDIR}${MANPREFIX}/man1/mang.1
 
 
