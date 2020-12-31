@@ -29,15 +29,15 @@ install: all
 	mkdir -p ${DESTDIR}${PREFIX}/bin
 	cp -r manglink mangd ${DESTDIR}${PREFIX}/bin
 	chmod 755 ${DESTDIR}${PREFIX}/bin/manglink ${DESTDIR}${PREFIX}/bin/mangd
-	#mkdir -p ${DESTDIR}${MANPREFIX}/man1
 	sed "s/VERSION/${VERSION}/g" < manglink.1 > ${DESTDIR}${MANPREFIX}/man1/manglink.1
-#	ln -fs ${DESTDIR}${MANPREFIX}/man1/mangrove.1 ${DESTDIR}${MANPREFIX}/man1/mang.1
+	sed "s/VERSION/${VERSION}/g" < mangd.8 > ${DESTDIR}${MANPREFIX}/man8/mangd.8
+	sed "s/VERSION/${VERSION}/g" < mangd.conf.5 > ${DESTDIR}${MANPREFIX}/man5/mangd.conf.5
 
 uninstall:
 	rm -f ${DESTDIR}${PREFIX}/bin/manglink
 	rm -f ${DESTDIR}${PREFIX}/bin/mangd
 	rm -f ${DESTDIR}${MANPREFIX}/man1/manglink.1 
-#	${DESTDIR}${MANPREFIX}/man1/mang.1
-
+	rm -f ${DESTDIR}${MANPREFIX}/man8/mangd.8 
+	rm -f ${DESTDIR}${MANPREFIX}/man5/mangd.conf.5 
 
 .PHONY: all options clean install uninstall
