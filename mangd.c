@@ -66,20 +66,12 @@ static int	 read_config(FILE *, CfgLine *);
 int
 main(int argc, char *argv[])
 {
-	int ch;
-
 	if (pledge("stdio rpath proc ps", NULL) == -1)
 		err(1, "pledge");
 
-	while ((ch = getopt(argc, argv, "l")) != -1) {
-		switch (ch) {
-		case 'l':
-			lflag = 1;
-			break;
-		default:
-			(void)fprintf(stdout, "usage: %s [-l]\n", __progname);
-			return 1;
-		}
+	if (argc > 1) {
+		(void)fprintf(stdout, "usage: %s\n", __progname);
+		return 1;
 	}
 	diff_procs();
 	return 0;
@@ -94,10 +86,6 @@ diff_procs(void)
 	FILE *fp;
 	Snapshot *ss = NULL;
 
-	/* 
-	 * create chained list of Snapshot with one a t,
-	 * and an othert t + RefreshRate.
-	 */
 	if ((fp = fopen(MANGD_CONF_FILE, "r")) == NULL)
 		errx(1, "could not open config file %s", MANGD_CONF_FILE);
 	if (((ss = malloc(sizeof(Snapshot))) == NULL) ||
@@ -121,7 +109,7 @@ diff_procs(void)
 	   	   sizeof(struct kinfo_proc), &(ss->next->entriesnb))) == NULL)
 			errx(1, "Error can't get procs from kvm");
 		/* 
-		 * Compute the difference between the two snapshot.
+		 * Compute diff between the two snapshot.
 		 * Call kill_procs() on each diff between s and s->next.
 		 */
 		for (i = 0; i < ss->entriesnb; i++) {
@@ -149,7 +137,6 @@ kill_procs(kvm_t *kvmd, Snapshot *ss, int index, FILE *fp)
 	if ((kinfo = kvm_getprocs(kvmd, KERN_PROC_ALL, 0,
 	   sizeof(struct kinfo_proc), &entriesnb)) == NULL)
 		errx(1, "Error can't get procs from kvm");
-	/* fetch parent and child into cfg.prt and cfg.chd */
 	while (read_config(fp, &cfg)) {
 		if (!(strcmp(cfg.prt, ss->kinfo[index].p_comm))) {
 			for (i = 0; i < entriesnb; i++) {
@@ -166,21 +153,17 @@ static int
 read_config(FILE *fp, CfgLine *line)
 {
 	enum { PARENT, CHILD };
-	char ch;
+	int ch;
 	int role;
 	int chdsize = 0;
 	int prtsize = 0;
 	/* flags */
-	int comment = 0;
-	int quote = 0;
-	int linker = 0;
-	int error = 0;
+	int comment, quote, linker, error;
 
-	if (line == NULL)
-		errx(1, "Error NULL pointer");
+	role = PARENT;
+	comment = quote = linker = error = 0;
 	memset(line->prt, '\0', sizeof(line->prt));
 	memset(line->chd, '\0', sizeof(line->chd));
-	role = PARENT;
 	while ((ch = fgetc(fp)) != ';') {
 		if (ch == EOF)
 			return 0;
