@@ -14,16 +14,13 @@ file.
 
 The links have the following format:
 
-	"command1">"command2"
+	'command1'->'command2';
 
 command1 and command2 have to be process commands (i.e. same as the commands in
 the COMMAND section of
 .B top(1) .
-
-No spaces are allowed outside of double quotes. Else it may cause some
-parsing errors - a warning message will be printed on standard output -
-and the daemon will stay alive. In the same way the 4th double quote has to be
-follow by a newline ("command">"command2"\\n).
+White spaces and newline are ignored outside of quotes, and each link is
+terminad by a semicolon.
 
 Command can't contain a double quote (i.e. no escape with \\), and its size must
 be between 0 and KI_MAXCOMLEN.
