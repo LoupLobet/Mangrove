@@ -56,8 +56,8 @@ typedef struct Snapshot {
 } Snapshot;
 
 extern char *__progname;
-int dflag, lflag;
-useconds_t refresh_rate = 100000; /* 0.1s */
+int lflag;
+useconds_t RefreshRate = 100000; /* 0.1s */
 
 static int 	 diff_procs(void);
 static int	 kill_procs(kvm_t *, Snapshot *, int, FILE *);
@@ -71,16 +71,13 @@ main(int argc, char *argv[])
 	if (pledge("stdio rpath proc ps", NULL) == -1)
 		err(1, "pledge");
 
-	while ((ch = getopt(argc, argv, "dil")) != -1) {
+	while ((ch = getopt(argc, argv, "l")) != -1) {
 		switch (ch) {
-		case 'd':
-			dflag = 1;
-			break;
 		case 'l':
 			lflag = 1;
 			break;
 		default:
-			(void)fprintf(stdout, "usage: %s [-dl] [-i seconds]\n", __progname);
+			(void)fprintf(stdout, "usage: %s [-l]\n", __progname);
 			return 1;
 		}
 	}
@@ -95,36 +92,46 @@ diff_procs(void)
 	int i, j;
 	int missing;
 	FILE *fp;
-	Snapshot *s = NULL;
+	Snapshot *ss = NULL;
 
+	/* 
+	 * create chained list of Snapshot with one a t,
+	 * and an othert t + RefreshRate.
+	 */
 	if ((fp = fopen(MANGD_CONF_FILE, "r")) == NULL)
 		errx(1, "could not open config file %s", MANGD_CONF_FILE);
-	if (((s = malloc(sizeof(Snapshot))) == NULL) ||
-	   ((s->next = malloc(sizeof(Snapshot))) == NULL))
+	if (((ss = malloc(sizeof(Snapshot))) == NULL) ||
+	   ((ss->next = malloc(sizeof(Snapshot))) == NULL))
 		err(1, NULL);
-	s->next->next = s;
+	ss->next->next = ss;
 
-	if ((s->kvmd = kvm_openfiles(NULL, NULL, NULL,
+	if ((ss->kvmd = kvm_openfiles(NULL, NULL, NULL,
 	   KVM_NO_FILES, errbuf)) == NULL)
 		errx(1, "%s", errbuf);
-	if ((s->next->kvmd = kvm_openfiles(NULL, NULL, NULL,
+	if ((ss->next->kvmd = kvm_openfiles(NULL, NULL, NULL,
 	   KVM_NO_FILES, errbuf)) == NULL)
 		errx(1, "%s", errbuf);
-	if ((s->kinfo = kvm_getprocs(s->kvmd, KERN_PROC_ALL, 0,
-	   sizeof(struct kinfo_proc), &(s->entriesnb))) == NULL)
+	if ((ss->kinfo = kvm_getprocs(ss->kvmd, KERN_PROC_ALL, 0,
+	   sizeof(struct kinfo_proc), &(ss->entriesnb))) == NULL)
 		errx(1, "Error can't get procs from kvm");
-	while (usleep(refresh_rate) == 0) {
-		if ((s->next->kinfo = kvm_getprocs(s->next->kvmd, KERN_PROC_ALL, 0,
-	   	   sizeof(struct kinfo_proc), &(s->next->entriesnb))) == NULL)
+
+	/* listening loop */
+	while (usleep(RefreshRate) == 0) {
+		if ((ss->next->kinfo = kvm_getprocs(ss->next->kvmd, KERN_PROC_ALL, 0,
+	   	   sizeof(struct kinfo_proc), &(ss->next->entriesnb))) == NULL)
 			errx(1, "Error can't get procs from kvm");
-		for (i = 0; i < s->entriesnb; i++) {
-			for (j = 0, missing = 1; j < s->next->entriesnb; j++)
-				if (s->kinfo[i].p_pid == s->next->kinfo[j].p_pid)
+		/* 
+		 * Compute the difference between the two snapshot.
+		 * Call kill_procs() on each diff between s and s->next.
+		 */
+		for (i = 0; i < ss->entriesnb; i++) {
+			for (j = 0, missing = 1; j < ss->next->entriesnb; j++)
+				if (ss->kinfo[i].p_pid == ss->next->kinfo[j].p_pid)
 					missing = 0;
 			if (missing)
-				kill_procs(s->next->kvmd, s, i, fp);
+				kill_procs(ss->next->kvmd, ss, i, fp);
 		}
-		s = s->next;
+		ss = ss->next;
 	}
 	if (fclose(fp) != 0)
 		err(1, NULL);
@@ -132,7 +139,7 @@ diff_procs(void)
 }
 
 static int
-kill_procs(kvm_t *kvmd, Snapshot *s, int index, FILE *fp)
+kill_procs(kvm_t *kvmd, Snapshot *ss, int index, FILE *fp)
 {
 	CfgLine cfg;
 	int entriesnb;
@@ -142,8 +149,9 @@ kill_procs(kvm_t *kvmd, Snapshot *s, int index, FILE *fp)
 	if ((kinfo = kvm_getprocs(kvmd, KERN_PROC_ALL, 0,
 	   sizeof(struct kinfo_proc), &entriesnb)) == NULL)
 		errx(1, "Error can't get procs from kvm");
-	while (read_config(fp, &cfg) == 1) {
-		if (!(strcmp(cfg.prt, s->kinfo[index].p_comm))) {
+	/* fetch parent and child into cfg.prt and cfg.chd */
+	while (read_config(fp, &cfg)) {
+		if (!(strcmp(cfg.prt, ss->kinfo[index].p_comm))) {
 			for (i = 0; i < entriesnb; i++) {
 				if (!strcmp(kinfo[i].p_comm, cfg.chd))
 					kill(kinfo[i].p_pid, SIGKILL);
@@ -157,74 +165,53 @@ kill_procs(kvm_t *kvmd, Snapshot *s, int index, FILE *fp)
 static int
 read_config(FILE *fp, CfgLine *line)
 {
-	/* 
-	 * read_config() reads at most CONF_LINE_SIZE characters from the fp
-	 * stream. The readed content is parsed with following rules :
-	 * 	- A line have the following prototype : "parent">"child"\n\0
-	 * 	- If the line is too long to fit in buf[1024], the daemon is
-	 * 	  stopped, and an error message is printed.
-	 * 	- Blank lines (i.e., begining with a '\0') are ignored.
-	 * 	- Parents and childs have to be double quoted.
-	 * 	- No spaces or tabs are expected outside of quotes.
-	 * 	- Escape character '\\' can't be used from this same usage
-	 * 	  (i.e no double quote(s) inside parent or child quotes).
-	 * 	- A line is considered as a comment if it's first character
-	 * 	  is a '#', in this case the line will not be parsed.
-	 * 	  End of line comments will return an error.
-	 * If an Error is encoutered during the parsing, read_config()
-	 * return 0 and a warning message is printed. In this case line content
-	 * is indeterminate, and should not be used.
-	 * Else 1 is returned on successfuk completion.
-	 */
-	static char buf[CONF_LINE_SIZE];
-	int i, j, rval = 1;
-	char *p = NULL;
+	enum { PARENT, CHILD };
+	char ch;
+	int role;
+	int chdsize = 0;
+	int prtsize = 0;
+	/* flags */
+	int comment = 0;
+	int quote = 0;
+	int linker = 0;
+	int error = 0;
 
 	if (line == NULL)
 		errx(1, "Error NULL pointer");
 	memset(line->prt, '\0', sizeof(line->prt));
 	memset(line->chd, '\0', sizeof(line->chd));
-	if ((fgets(buf, sizeof(buf), fp) != NULL) &&
-	   ((p = strchr(buf, '\n')) != NULL)) {
-		*p = '\0';
-		if ((buf[0] == '#') || (buf[0] == '\0'))
-			/* comment or balk line, no parsing */
-			rval = 0 ;
-		else if (buf[0] == '"') {
-			for (i = 1; rval && (i <= KI_MAXCOMLEN) &&
-			    (buf[i] != '"'); i++)
-				line->prt[i - 1] = buf[i];
-			if (buf[i++] != '"') {
-				warnx("Error quote too long");
-				rval = 0;
-			}
-			if (rval && buf[i++] != '>') {
-				warnx("Error unexpected separator");
-				rval = 0;
-			}
-			if (rval && buf[i++] != '"') {
-				warnx("Error quote too long");
-				rval = 0;
-			}
-			for (j = 0; rval && (j < KI_MAXCOMLEN) &&
-			    (buf[i] != '"'); i++, j++)
-				line->chd[j] = buf[i];
-			if (rval && buf[i++] != '"') {
-				warnx("Error quote too long");
-				rval = 0;
-			}
-			if (rval && &(buf[i]) != p) {
-				warnx("Error expected newline after quote");
-				rval = 0;
-			}
-		} else {
-			warnx("Error expected quote on first column");
-			rval = 0;
+	role = PARENT;
+	while ((ch = fgetc(fp)) != ';') {
+		if (ch == EOF)
+			return 0;
+		if (error)
+			continue;
+		if (ch == '\n') {
+			comment = 0;
+			if (quote)
+				error = 1;
 		}
-	} else {
-		if (!feof(fp))
-			errx(1, "Error in config file: line too long");
-		rval = 0;
+		else if (comment)
+			continue;
+		else if (ch == '\'')
+			quote = !quote;
+		else if (!quote && ch == '#')
+			comment = 1;
+		else if (!quote && !linker && (ch == ' ' || ch == '\t'))
+			continue;
+		else if (quote && role == PARENT && prtsize < KI_MAXCOMLEN)
+			line->prt[prtsize++] = ch;
+		else if (ch == '-')
+			linker = 1;
+		else if (linker && ch == '>' && role == PARENT && prtsize) {
+			role = CHILD;
+			linker = 0;
+		} else if (quote && role == CHILD && chdsize < KI_MAXCOMLEN)
+			line->chd[chdsize++] = ch;
+		else
+			error = 1;
 	}
-	return rval;
+	if (error)
+		return 0;
+	return 1;
 }
