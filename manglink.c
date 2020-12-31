@@ -133,7 +133,7 @@ write_link(char *parent, char *child)
 	if (rflag)
 		SWAP(*p, *c, buf);
 	for (i = 0; i < (1 + bflag); i++) {
-		(void)fprintf(stdout, "\"%s\">\"%s\"\n", *p, *c);
+		(void)fprintf(stdout, "'%s'->'%s'\n", *p, *c);
 		if (ferror(stdout))
 			err(1, "stdout");
 		if (bflag || rflag) 
