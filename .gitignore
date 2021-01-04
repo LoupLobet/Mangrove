@@ -1,5 +1,6 @@
 .gitignore
 manglink
 mangd
+mangd2.c
 *.core
 *.o
