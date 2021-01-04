@@ -40,12 +40,14 @@
 #include <string.h>
 #include <unistd.h>
 
-#define CONF_LINE_SIZE 2048
 #define MANGD_CONF_FILE "/etc/mangd.conf"
 
+enum { QUOTE, DQUOTE };
+
 typedef struct {
-	char prt[KI_MAXCOMLEN];
-	char chd[KI_MAXCOMLEN];
+	char pargs[_POSIX2_LINE_MAX];
+	char cargs[_POSIX2_LINE_MAX];
+	int quotetype;
 } CfgLine;
 
 typedef struct Snapshot {
@@ -60,13 +62,14 @@ int lflag;
 useconds_t RefreshRate = 100000; /* 0.1s */
 
 static int 	 diff_procs(void);
-static int	 kill_procs(kvm_t *, Snapshot *, int, FILE *);
+static char *	 getargvs(kvm_t *, struct kinfo_proc *);
+static int	 kill_procs(Snapshot *, int, FILE *);
 static int	 read_config(FILE *, CfgLine *);
 
 int
 main(int argc, char *argv[])
 {
-	if (pledge("stdio rpath proc ps", NULL) == -1)
+	if (pledge("exec stdio rpath proc ps", NULL) == -1)
 		err(1, "pledge");
 
 	if (argc > 1) {
@@ -102,7 +105,6 @@ diff_procs(void)
 	if ((ss->kinfo = kvm_getprocs(ss->kvmd, KERN_PROC_ALL, 0,
 	   sizeof(struct kinfo_proc), &(ss->entriesnb))) == NULL)
 		errx(1, "Error can't get procs from kvm");
-
 	/* listening loop */
 	while (usleep(RefreshRate) == 0) {
 		if ((ss->next->kinfo = kvm_getprocs(ss->next->kvmd, KERN_PROC_ALL, 0,
@@ -116,8 +118,9 @@ diff_procs(void)
 			for (j = 0, missing = 1; j < ss->next->entriesnb; j++)
 				if (ss->kinfo[i].p_pid == ss->next->kinfo[j].p_pid)
 					missing = 0;
-			if (missing)
-				kill_procs(ss->next->kvmd, ss, i, fp);
+			if (missing) {
+				kill_procs(ss, i, fp);
+			}
 		}
 		ss = ss->next;
 	}
@@ -126,22 +129,48 @@ diff_procs(void)
 	return 0;
 }
 
+static char *
+getargvs(kvm_t *kd, struct kinfo_proc *kp)
+{
+	const int bufsize = _POSIX2_LINE_MAX;
+	static char buf[_POSIX2_LINE_MAX];	
+	int i;
+	char **argv = NULL;
+
+	if ((argv = kvm_getargv(kd, kp, 0)) == NULL) {
+		strlcpy(buf, kp->p_comm, bufsize);
+		return buf;
+	}
+	i = 0;
+	while (i < _POSIX2_LINE_MAX && *argv != NULL) {
+		int ret;
+		ret = snprintf(buf + i, bufsize - i, argv[1] != NULL ?
+		      "%s " : "%s", argv[0]);
+		if (ret >= bufsize - i)
+			i += bufsize - i - 1;
+		else if (ret > 0)
+			i += ret;
+		argv++;
+	}
+	return buf;
+}
+
 static int
-kill_procs(kvm_t *kvmd, Snapshot *ss, int index, FILE *fp)
+kill_procs(Snapshot *ss, int index, FILE *fp)
 {
 	CfgLine cfg;
-	int entriesnb;
-	struct kinfo_proc *kinfo = NULL;
-	int i;
+	int pid;
 
-	if ((kinfo = kvm_getprocs(kvmd, KERN_PROC_ALL, 0,
-	   sizeof(struct kinfo_proc), &entriesnb)) == NULL)
-		errx(1, "Error can't get procs from kvm");
 	while (read_config(fp, &cfg)) {
-		if (!(strcmp(cfg.prt, ss->kinfo[index].p_comm))) {
-			for (i = 0; i < entriesnb; i++) {
-				if (!strcmp(kinfo[i].p_comm, cfg.chd))
-					kill(kinfo[i].p_pid, SIGKILL);
+		if ((cfg.quotetype == QUOTE) &&
+		   !strcmp(cfg.pargs, ss->kinfo[index].p_comm)) {
+			pid = fork();
+			if (pid == -1)
+				errx(1, "Error: can't fork daemon for exec");
+			else if (pid == 0) {
+				char *cmd[] = {"/bin/sh", "-c", cfg.cargs, NULL };
+				if (execvp(cmd[0], cmd) == -1)
+					err(1, NULL);
 			}
 		}
 	}
@@ -158,12 +187,12 @@ read_config(FILE *fp, CfgLine *line)
 	int chdsize = 0;
 	int prtsize = 0;
 	/* flags */
-	int comment, quote, linker, error;
+	int escape, comment, quote, dquote, linker, error;
 
 	role = PARENT;
-	comment = quote = linker = error = 0;
-	memset(line->prt, '\0', sizeof(line->prt));
-	memset(line->chd, '\0', sizeof(line->chd));
+	comment = quote = linker = error = dquote = escape = 0;
+	memset(line->pargs, '\0', sizeof(line->pargs));
+	memset(line->cargs, '\0', sizeof(line->cargs));
 	while ((ch = fgetc(fp)) != ';') {
 		if (ch == EOF)
 			return 0;
@@ -176,23 +205,34 @@ read_config(FILE *fp, CfgLine *line)
 		}
 		else if (comment)
 			continue;
-		else if (ch == '\'')
-			quote = !quote;
-		else if (!quote && ch == '#')
-			comment = 1;
-		else if (!quote && !linker && (ch == ' ' || ch == '\t'))
+		else if (ch == '\\') {
+			escape = 1;
 			continue;
-		else if (quote && role == PARENT && prtsize < KI_MAXCOMLEN)
-			line->prt[prtsize++] = ch;
-		else if (ch == '-')
+		}
+		else if (ch == '\'' && !dquote && !escape)
+			quote = !quote;
+		else if (ch == '"' && !quote && !escape)
+			dquote = !dquote;
+		else if (!quote && !dquote && ch == '#')
+			comment = 1;
+		else if (!quote && !dquote && !linker && (ch == ' ' || ch == '\t'))
+			continue;
+		else if ((quote ^ dquote)  &&
+			role == PARENT && prtsize < _POSIX2_LINE_MAX - 2) {
+			if (!prtsize)
+				line->quotetype = (quote) ? QUOTE : DQUOTE;
+			line->pargs[prtsize++] = ch;
+		} else if (ch == '-' && !quote && !dquote)
 			linker = 1;
 		else if (linker && ch == '>' && role == PARENT && prtsize) {
 			role = CHILD;
 			linker = 0;
-		} else if (quote && role == CHILD && chdsize < KI_MAXCOMLEN)
-			line->chd[chdsize++] = ch;
-		else
+		} else if (quote && !dquote &&
+			  role == CHILD && chdsize < _POSIX2_LINE_MAX - 2) {
+			line->cargs[chdsize++] = ch;
+		} else
 			error = 1;
+		escape = 0;
 	}
 	if (error)
 		return 0;
