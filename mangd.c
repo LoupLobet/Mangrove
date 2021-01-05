@@ -42,12 +42,9 @@
 
 #define MANGD_CONF_FILE "/etc/mangd.conf"
 
-enum { QUOTE, DQUOTE };
-
 typedef struct {
 	char pargs[_POSIX2_LINE_MAX];
 	char cargs[_POSIX2_LINE_MAX];
-	int quotetype;
 } CfgLine;
 
 typedef struct Snapshot {
@@ -58,13 +55,12 @@ typedef struct Snapshot {
 } Snapshot;
 
 extern char *__progname;
-int lflag;
-useconds_t RefreshRate = 100000; /* 0.1s */
+useconds_t listening_rate = 10000;
 
 static int 	 diff_procs(void);
-static char *	 getargvs(kvm_t *, struct kinfo_proc *);
-static int	 kill_procs(Snapshot *, int, FILE *);
+static int	 exec_child(Snapshot *, int, FILE *);
 static int	 read_config(FILE *, CfgLine *);
+__dead void	 usage(void);
 
 int
 main(int argc, char *argv[])
@@ -72,10 +68,8 @@ main(int argc, char *argv[])
 	if (pledge("exec stdio rpath proc ps", NULL) == -1)
 		err(1, "pledge");
 
-	if (argc > 1) {
-		(void)fprintf(stdout, "usage: %s\n", __progname);
-		return 1;
-	}
+	if (argc > 1)
+		usage();
 	diff_procs();
 	return 0;
 }
@@ -105,22 +99,22 @@ diff_procs(void)
 	if ((ss->kinfo = kvm_getprocs(ss->kvmd, KERN_PROC_ALL, 0,
 	   sizeof(struct kinfo_proc), &(ss->entriesnb))) == NULL)
 		errx(1, "Error can't get procs from kvm");
+
 	/* listening loop */
-	while (usleep(RefreshRate) == 0) {
+	while (usleep(listening_rate) == 0) {
 		if ((ss->next->kinfo = kvm_getprocs(ss->next->kvmd, KERN_PROC_ALL, 0,
 	   	   sizeof(struct kinfo_proc), &(ss->next->entriesnb))) == NULL)
 			errx(1, "Error can't get procs from kvm");
 		/* 
 		 * Compute diff between the two snapshot.
-		 * Call kill_procs() on each diff between s and s->next.
+		 * Call exec_child() on each diff between s and s->next.
 		 */
 		for (i = 0; i < ss->entriesnb; i++) {
 			for (j = 0, missing = 1; j < ss->next->entriesnb; j++)
 				if (ss->kinfo[i].p_pid == ss->next->kinfo[j].p_pid)
 					missing = 0;
-			if (missing) {
-				kill_procs(ss, i, fp);
-			}
+			if (missing)
+				(void)exec_child(ss, i, fp);
 		}
 		ss = ss->next;
 	}
@@ -129,48 +123,23 @@ diff_procs(void)
 	return 0;
 }
 
-static char *
-getargvs(kvm_t *kd, struct kinfo_proc *kp)
-{
-	const int bufsize = _POSIX2_LINE_MAX;
-	static char buf[_POSIX2_LINE_MAX];	
-	int i;
-	char **argv = NULL;
-
-	if ((argv = kvm_getargv(kd, kp, 0)) == NULL) {
-		strlcpy(buf, kp->p_comm, bufsize);
-		return buf;
-	}
-	i = 0;
-	while (i < _POSIX2_LINE_MAX && *argv != NULL) {
-		int ret;
-		ret = snprintf(buf + i, bufsize - i, argv[1] != NULL ?
-		      "%s " : "%s", argv[0]);
-		if (ret >= bufsize - i)
-			i += bufsize - i - 1;
-		else if (ret > 0)
-			i += ret;
-		argv++;
-	}
-	return buf;
-}
-
 static int
-kill_procs(Snapshot *ss, int index, FILE *fp)
+exec_child(Snapshot *ss, int index, FILE *fp)
 {
 	CfgLine cfg;
 	int pid;
 
 	while (read_config(fp, &cfg)) {
-		if ((cfg.quotetype == QUOTE) &&
-		   !strcmp(cfg.pargs, ss->kinfo[index].p_comm)) {
+		if (!strcmp(cfg.pargs, ss->kinfo[index].p_comm)) {
 			pid = fork();
 			if (pid == -1)
 				errx(1, "Error: can't fork daemon for exec");
 			else if (pid == 0) {
-				char *cmd[] = {"/bin/sh", "-c", cfg.cargs, NULL };
-				if (execvp(cmd[0], cmd) == -1)
-					err(1, NULL);
+				char *cmd[] = { "/bin/sh", "-c", cfg.cargs, NULL };
+				if (execvp(cmd[0], cmd) == -1) {
+					warn(NULL);
+					return 1;
+				}
 			}
 		}
 	}
@@ -187,10 +156,10 @@ read_config(FILE *fp, CfgLine *line)
 	int chdsize = 0;
 	int prtsize = 0;
 	/* flags */
-	int escape, comment, quote, dquote, linker, error;
+	int escape, comment, quote, linker, error;
 
 	role = PARENT;
-	comment = quote = linker = error = dquote = escape = 0;
+	escape = comment = quote = linker = error = 0;
 	memset(line->pargs, '\0', sizeof(line->pargs));
 	memset(line->cargs, '\0', sizeof(line->cargs));
 	while ((ch = fgetc(fp)) != ';') {
@@ -209,26 +178,20 @@ read_config(FILE *fp, CfgLine *line)
 			escape = 1;
 			continue;
 		}
-		else if (ch == '\'' && !dquote && !escape)
+		else if (ch == '\'' && !escape)
 			quote = !quote;
-		else if (ch == '"' && !quote && !escape)
-			dquote = !dquote;
-		else if (!quote && !dquote && ch == '#')
+		else if (!quote && ch == '#')
 			comment = 1;
-		else if (!quote && !dquote && !linker && (ch == ' ' || ch == '\t'))
+		else if (!quote && !linker && (ch == ' ' || ch == '\t'))
 			continue;
-		else if ((quote ^ dquote)  &&
-			role == PARENT && prtsize < _POSIX2_LINE_MAX - 2) {
-			if (!prtsize)
-				line->quotetype = (quote) ? QUOTE : DQUOTE;
+		else if (quote && role == PARENT && prtsize < _POSIX2_LINE_MAX - 2) {
 			line->pargs[prtsize++] = ch;
-		} else if (ch == '-' && !quote && !dquote)
+		} else if (ch == '-' && !quote)
 			linker = 1;
 		else if (linker && ch == '>' && role == PARENT && prtsize) {
 			role = CHILD;
 			linker = 0;
-		} else if (quote && !dquote &&
-			  role == CHILD && chdsize < _POSIX2_LINE_MAX - 2) {
+		} else if (quote && role == CHILD && chdsize < _POSIX2_LINE_MAX - 2) {
 			line->cargs[chdsize++] = ch;
 		} else
 			error = 1;
@@ -237,4 +200,10 @@ read_config(FILE *fp, CfgLine *line)
 	if (error)
 		return 0;
 	return 1;
+}
+
+__dead void
+usage(void) {
+	(void)fprintf(stdout, "usage: %s [-f msec]\n", __progname);
+	exit(1);
 }
