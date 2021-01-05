@@ -3,20 +3,24 @@
 mangd \- Mangrove daemon.
 .SH DESCRIPTION
 .B mangd
-is the daemon profram for the the Mangrove tool.
+is the Mangrove daemon.
 .B mangd
-listens to process death through kernel virtual memory, and allows the user to kill
-some semanticly linked processes, depending of the
+listens to process death through kernel virtual memory, and allows the user to
+execute a shell command depending of the
 .IR /etc/mangd.conf
 file.
 
 .B mangd
 reads
 .IR /etc/mangd.conf continuously, so the configuration can be changed during
-runtime. The daemon can be configured easily with
-.B manglink(1) .
+runtime. 
 See the
 .B mangd(5)
 man page for configuration format.
+.SH NOTE
+Mangrove is FULLY EXPERIMENTAL because of race conditions (possibly short life time
+processes death, like ls(1), cat(1) ... May not be detected by the daemon
+because of the artificial slowness of mangd (usleep(3) is called between each listening,
+to save some cpu usage).
 .SH SEE ALSO
-manglink(1), mangd.conf(5)
+mangd.conf(5)
