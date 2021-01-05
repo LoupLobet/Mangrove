@@ -8,21 +8,18 @@ This manual page describes the
 configuration file.
 
 .B mangd
-manages process death according to link written in the
+execute a shell command when a process is terminated, according to links written in the
 .R /etc/mangd.conf
 file.
 
 The links have the following format:
 
-	'command1'->'command2';
+	'process command'->'shell command';
 
-command1 and command2 have to be process commands (i.e. same as the commands in
-the COMMAND section of
-.B top(1) .
 White spaces and newline are ignored outside of quotes, and each link is
 terminad by a semicolon. Comments begin with a # and go to the end of the line.
 
-Command can't contain a double quote (i.e. no escape with \\), and its size must
-be between 0 and KI_MAXCOMLEN.
+The maximum process command len is KI_MAXCOMLEN - 1, and the maximum shell
+command len is _POSIX2_MAX_LINE - 1;
 .SH SEE ALSO
-manglink(1), mangd(8)
+mangd(8)

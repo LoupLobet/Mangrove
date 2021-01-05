@@ -184,14 +184,14 @@ read_config(FILE *fp, CfgLine *line)
 			comment = 1;
 		else if (!quote && !linker && (ch == ' ' || ch == '\t'))
 			continue;
-		else if (quote && role == PARENT && prtsize < _POSIX2_LINE_MAX - 2) {
+		else if (quote && role == PARENT && prtsize < KI_MAXCOMLEN - 1) {
 			line->pargs[prtsize++] = ch;
 		} else if (ch == '-' && !quote)
 			linker = 1;
 		else if (linker && ch == '>' && role == PARENT && prtsize) {
 			role = CHILD;
 			linker = 0;
-		} else if (quote && role == CHILD && chdsize < _POSIX2_LINE_MAX - 2) {
+		} else if (quote && role == CHILD && chdsize < _POSIX2_LINE_MAX - 1) {
 			line->cargs[chdsize++] = ch;
 		} else
 			error = 1;
