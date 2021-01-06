@@ -112,9 +112,8 @@ exec_child(Snapshot *ss, int index, FILE *fp)
 				errx(1, "Error: can't fork daemon for exec");
 			else if (pid == 0) {
 				char *cmd[] = { "/bin/sh", "-c", cfg.cargs, NULL };
-				if (execvp(cmd[0], cmd) == -1) {
+				if (execvp(cmd[0], cmd) == -1)
 					warn(NULL);
-				}
 			}
 		}
 	}
@@ -156,16 +155,16 @@ read_config(FILE *fp, CfgLine *line)
 			comment = 1;
 		else if (!quote && !linker && (ch == ' ' || ch == '\t'))
 			continue;
-		else if (quote && role == PARENT && prtsize < KI_MAXCOMLEN - 1) {
+		else if (quote && role == PARENT && prtsize < KI_MAXCOMLEN - 1)
 			line->pargs[prtsize++] = ch;
-		} else if (ch == '-' && !quote)
+		else if (ch == '-' && !quote)
 			linker = 1;
 		else if (linker && ch == '>' && role == PARENT && prtsize) {
 			role = CHILD;
 			linker = 0;
-		} else if (quote && role == CHILD && chdsize < _POSIX2_LINE_MAX - 1) {
+		} else if (quote && role == CHILD && chdsize < _POSIX2_LINE_MAX - 1)
 			line->cargs[chdsize++] = ch;
-		} else
+		else
 			error = 1;
 		escape = 0;
 	}
