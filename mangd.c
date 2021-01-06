@@ -1,32 +1,8 @@
-/*
- * Copyright (c) 2020, Loup Lobet
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * 1. Redistributions of source code must retain the above copyright notice, this
- * list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
+/* See LICENCE file for copyright and licence details */
 
 #include <sys/param.h>
-#include <sys/sysctl.h>
 #include <sys/stat.h>
+#include <sys/sysctl.h>
 
 #include <errno.h>
 #include <err.h>
@@ -57,10 +33,9 @@ typedef struct Snapshot {
 extern char *__progname;
 useconds_t listening_rate = 10000;
 
-static int 	 diff_procs(void);
-static int	 exec_child(Snapshot *, int, FILE *);
+static void 	 diff_procs(void);
+static void	 exec_child(Snapshot *, int, FILE *);
 static int	 read_config(FILE *, CfgLine *);
-__dead void	 usage(void);
 
 int
 main(int argc, char *argv[])
@@ -68,13 +43,15 @@ main(int argc, char *argv[])
 	if (pledge("exec stdio rpath proc ps", NULL) == -1)
 		err(1, "pledge");
 
-	if (argc > 1)
-		usage();
+	if (argc > 1) {
+		(void)fprintf(stdout, "usage: %s [-f msec]\n", __progname);
+		return 1;
+	}
 	diff_procs();
 	return 0;
 }
 
-static int
+static void
 diff_procs(void)
 {
 	char errbuf[_POSIX2_LINE_MAX];
@@ -114,16 +91,15 @@ diff_procs(void)
 				if (ss->kinfo[i].p_pid == ss->next->kinfo[j].p_pid)
 					missing = 0;
 			if (missing)
-				(void)exec_child(ss, i, fp);
+				exec_child(ss, i, fp);
 		}
 		ss = ss->next;
 	}
 	if (fclose(fp) != 0)
 		err(1, NULL);
-	return 0;
 }
 
-static int
+static void
 exec_child(Snapshot *ss, int index, FILE *fp)
 {
 	CfgLine cfg;
@@ -138,13 +114,11 @@ exec_child(Snapshot *ss, int index, FILE *fp)
 				char *cmd[] = { "/bin/sh", "-c", cfg.cargs, NULL };
 				if (execvp(cmd[0], cmd) == -1) {
 					warn(NULL);
-					return 1;
 				}
 			}
 		}
 	}
 	rewind(fp);
-	return 0;
 }
 
 static int
@@ -171,14 +145,12 @@ read_config(FILE *fp, CfgLine *line)
 			comment = 0;
 			if (quote)
 				error = 1;
-		}
-		else if (comment)
+		} else if (comment)
 			continue;
 		else if (ch == '\\') {
 			escape = 1;
 			continue;
-		}
-		else if (ch == '\'' && !escape)
+		} else if (ch == '\'' && !escape)
 			quote = !quote;
 		else if (!quote && ch == '#')
 			comment = 1;
@@ -200,10 +172,4 @@ read_config(FILE *fp, CfgLine *line)
 	if (error)
 		return 0;
 	return 1;
-}
-
-__dead void
-usage(void) {
-	(void)fprintf(stdout, "usage: %s [-f msec]\n", __progname);
-	exit(1);
 }
